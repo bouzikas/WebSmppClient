@@ -1,0 +1,12 @@
+*.o
+*.a
+*.log
+.DS_Store
+autom4te.cache
+config.status
+config.guess
+configure
+Makefile
+gw-config.h
+gw-config
+WebSmppClient.xcodeproj
