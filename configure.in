@@ -65,7 +65,7 @@ dnl initialization
 AC_PREREQ(2.5)
 
 AC_INIT(gw/alt_charsets.h)
-AC_CONFIG_HEADER(gw-config.h)
+AC_CONFIG_HEADER(gwlib/gw-config.h)
 AC_SUBST(SHELL)
 AC_CONFIG_AUX_DIR(.)
 AC_SET_TERMINAL_SEQUENCES()
@@ -1272,7 +1272,7 @@ AC_ARG_WITH(wtls,
 dnl Final Output
 
 AC_CONFIG_SECTION([Generating output files]) 
-AC_OUTPUT(gwlib/gw_uuid_types.h Makefile)
+AC_OUTPUT(gwlib/gwlib/gw_uuid_types.h Makefile)
 
 
 dnl LICENSE notice

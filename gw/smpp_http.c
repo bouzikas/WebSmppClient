@@ -68,7 +68,7 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include "../gwlib/gwlib.h"
+#include "gwlib/gwlib.h"
 #include "smpp_client.h"
 
 /* passed from smpp_client core */

@@ -76,7 +76,7 @@ LIBOBJS=@LIBOBJS@
 LIBSRCS=$(LIBOBJS:.o=.c)
 
 LIBS=@LIBS@ @LIBICONV@
-CFLAGS=-D_REENTRANT=1 -I. -Igw @CFLAGS@
+CFLAGS=-D_REENTRANT=1 -I. -Igw -I./gwlib @CFLAGS@
 LDFLAGS=@LDFLAGS@
 
 MKDEPEND=$(CC) $(CFLAGS) -MM
@@ -114,7 +114,7 @@ sbinprogs = $(sbinsrcs:.c=)
 gwsrcs = $(wildcard gw/*.c) $(wildcard gw/smsc/*.c)
 gwobjs = $(filter-out $(progobjs),$(gwsrcs:.c=.o))
 
-libsrcs = $(wildcard gwlib/*.c) $(LIBSRCS)
+libsrcs = $(wildcard gwlib/gwlib/*.c) $(LIBSRCS)
 libobjs = $(libsrcs:.c=.o) $(LIBOBJS)
 
 wapsrcs = $(wildcard wap/*.c) $(wildcard radius/*.c)
@@ -150,7 +150,7 @@ pres = $(srcs:.c=.i)
 
 libs = libgw.a libwmlscript.a libwap.a libgwlib.a
 
-srcdirs = gw gw/smsc gwlib test utils wmlscript checks wap radius
+srcdirs = gw gw/smsc gwlib/gwlib test utils wmlscript checks wap radius
 
 man1pages = utils/seewbmp.1 utils/mtbatch.1 wmlscript/wmlsc.1 wmlscript/wmlsdasm.1
 man8pages = gw/kannel.8 utils/run_kannel_box.8
@@ -257,9 +257,9 @@ install: all
 	$(INSTALL) $(man1pages) $(DESTDIR)$(mandir)/man1
 	$(INSTALL) -d $(DESTDIR)$(mandir)/man8
 	$(INSTALL) $(man8pages) $(DESTDIR)$(mandir)/man8
-	$(INSTALL) -d $(DESTDIR)$(includedir)/kannel/gwlib
-	$(INSTALL_DATA) $(top_srcdir)/gwlib/*.h $(DESTDIR)$(includedir)/kannel/gwlib
-	$(INSTALL_DATA) $(top_srcdir)/gwlib/*.def $(DESTDIR)$(includedir)/kannel/gwlib
+	$(INSTALL) -d $(DESTDIR)$(includedir)/kannel/gwlib/gwlib
+	$(INSTALL_DATA) $(top_srcdir)/gwlib/gwlib/*.h $(DESTDIR)$(includedir)/kannel/gwlib/gwlib
+	$(INSTALL_DATA) $(top_srcdir)/gwlib/gwlib/*.def $(DESTDIR)$(includedir)/kannel/gwlib/gwlib
 	$(INSTALL) -d $(DESTDIR)$(includedir)/kannel/gw
 	$(INSTALL_DATA) $(top_srcdir)/gw/*.h $(DESTDIR)$(includedir)/kannel/gw
 	$(INSTALL_DATA) $(top_srcdir)/gw/*.def $(DESTDIR)$(includedir)/kannel/gw
@@ -315,7 +315,7 @@ clean:
 	rm -f $(benchoutputs)
 
 distclean: clean
-	rm -f Makefile gw-config.h config.cache config.log config.status config.nice gwlib/gw_uuid_types.h
+	rm -f Makefile gw-config.h config.cache config.log config.status config.nice gwlib/gwlib/gw_uuid_types.h
 
 nag:
 	utils/find-long-lines

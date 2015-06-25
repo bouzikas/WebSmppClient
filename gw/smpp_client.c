@@ -70,7 +70,7 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include "../gwlib/gwlib.h"
+#include "gwlib/gwlib.h"
 #include "msg.h"
 #include "smpp_client.h"
 #include "shared.h"

@@ -1,0 +1,3 @@
+[submodule "gwlib"]
+	path = gwlib
+	url = https://github.com/dimimpou/gwlib.git
