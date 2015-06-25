@@ -4,7 +4,7 @@
 .DS_Store
 autom4te.cache
 config.status
-config.guess
+config.nice
 configure
 Makefile
 gw-config.h
