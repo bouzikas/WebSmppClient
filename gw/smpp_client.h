@@ -78,9 +78,16 @@ enum {
 
 /* type of output given by various status functions */
 enum {
-    BBSTATUS_HTML = 0,
-    BBSTATUS_TEXT = 1,
-    BBSTATUS_WML = 2,
-    BBSTATUS_XML = 3
+    STATUS_HTML = 0,
+    STATUS_TEXT = 1,
+    STATUS_WML = 2,
+    STATUS_XML = 3
 };
+
+/*---------------
+ * smpp_http.c (HTTP Admin)
+ */
+
+int httpadmin_start(Cfg *config);
+void httpadmin_stop(void);
 

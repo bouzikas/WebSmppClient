@@ -9,4 +9,6 @@ configure
 Makefile
 gw-config.h
 gw-config
+gw/smpp_client
+gwlib/gw_uuid_types.h
 WebSmppClient.xcodeproj

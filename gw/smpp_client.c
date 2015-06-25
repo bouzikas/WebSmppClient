@@ -86,8 +86,72 @@ volatile sig_atomic_t client_status;
 static Mutex *status_mutex;
 static time_t start_time;
 
+/*-------------------------------------------------------
+ * signals
+ */
+
+static void signal_handler(int signum)
+{
+	/* On some implementations (i.e. linuxthreads), signals are delivered
+	 * to all threads.  We only want to handle each signal once for the
+	 * entire box, and we let the gwthread wrapper take care of choosing
+	 * one.
+	 */
+	if (!gwthread_shouldhandlesignal(signum))
+		return;
+	
+	switch (signum) {
+		case SIGINT:
+		case SIGTERM:
+			if (client_status != SHUTDOWN && client_status != DEAD) {
+				client_status = SHUTDOWN;
+			}
+			else if (client_status == SHUTDOWN) {
+				client_status = DEAD;
+			}
+			else if (client_status == DEAD) {
+				panic(0, "Cannot die by its own will");
+			}
+			break;
+			
+		case SIGHUP:
+			log_reopen();
+			alog_reopen();
+			break;
+			
+			/*
+			 * It would be more proper to use SIGUSR1 for this, but on some
+			 * platforms that's reserved by the pthread support.
+			 */
+		case SIGQUIT:
+			warning(0, "SIGQUIT received, reporting memory usage.");
+			gw_check_leaks();
+			break;
+	}
+}
+
+static void setup_signal_handlers(void)
+{
+	struct sigaction act;
+	
+	act.sa_handler = signal_handler;
+	sigemptyset(&act.sa_mask);
+	act.sa_flags = 0;
+	sigaction(SIGINT, &act, NULL);
+	sigaction(SIGTERM, &act, NULL);
+	sigaction(SIGQUIT, &act, NULL);
+	sigaction(SIGHUP, &act, NULL);
+	sigaction(SIGPIPE, &act, NULL);
+}
+
 static Cfg *init_client(Cfg *cfg)
 {
+	status_mutex = mutex_create();
+	
+	setup_signal_handlers();
+	
+	httpadmin_start(cfg);
+	
 	return cfg;
 }
 
