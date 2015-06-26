@@ -79,12 +79,12 @@ if test "x$VERSION" = "xsvn"; then
   AC_MSG_RESULT([$SVN_REVISION])
   VERSION="$VERSION-r$SVN_REVISION"
 fi
-AC_DEFINE_UNQUOTED(GW_NAME, "WebSmpp")
+AC_DEFINE_UNQUOTED(GW_NAME, "WebSmppClient")
 AC_DEFINE_UNQUOTED(GW_VERSION, "$VERSION")
 AC_DEFINE_UNQUOTED(VERSION, "$VERSION")
 AC_SUBST(GW_VERSION)
 AC_SUBST(VERSION)
-AC_CONFIG_SECTION([Configuring for WebSmpp version $VERSION])
+AC_CONFIG_SECTION([Configuring for WebSmppClient version $VERSION])
 
 dnl Solaris pkgadd support definitions
 PKGADD_PKG="WebSmppClient"
