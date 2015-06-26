@@ -155,6 +155,48 @@ static Cfg *init_client(Cfg *cfg)
 	return cfg;
 }
 
+Octstr *print_status(List *cgivars, int status_type)
+{
+	char *s, *lb;
+	char *frmt, *footer;
+	Octstr *ret, *str, *version;
+	Octstr *password;
+	time_t t;
+	
+	if ((lb = status_linebreak(status_type)) == NULL)
+		return octstr_create("Un-supported format");
+	
+	t = time(NULL) - start_time;
+	
+	if (client_status == RUNNING)
+		s = "running";
+	else
+		s = "shutting down";
+	
+	version = version_report_string("");
+	
+	if (status_type == STATUS_HTML) {
+		frmt = "%s</p>\n\n <p>Status: %s, uptime %ldd %ldh %ldm %lds</p>\n\n";
+		footer = "</p>";
+	} else if (status_type == STATUS_WML) {
+		frmt = "%s</p>\n\n <p>Status: %s, uptime %ldd %ldh %ldm %lds</p>\n\n";
+		footer = "</p>";
+	} else if (status_type == STATUS_XML) {
+		frmt = "<version>%s</version>\n <status>%s, uptime %ldd %ldh %ldm %lds</status>\n";
+		footer = "</p>";
+	} else {
+		frmt = "%s</p>\n\n <p>Status: %s, uptime %ldd %ldh %ldm %lds</p>\n\n";
+		footer = "";
+	}
+	
+	ret = octstr_format(frmt, octstr_get_cstr(version), s, t/3600/24, t/3600%24, t/60%60, t%60);
+	
+	octstr_append_cstr(ret, footer);
+	octstr_destroy(version);
+	
+	return ret;
+}
+
 int main(int argc, char **argv)
 {
 	int cf_index;

@@ -10,7 +10,7 @@ A web based tool that allows you to connect and send messages using SMPP protoco
 $ git clone https://github.com/dimimpou/WebSmppClient.git
 $ cd WebSmppClient
 $ autoconf
-$ ./configure
+$ ./configure --with-mysql "CFLAGS=-O0 -g"	# sets optimization to zero
 $ make
 ```
 

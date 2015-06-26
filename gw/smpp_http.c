@@ -125,7 +125,7 @@ static Octstr *httpd_status(List *cgivars, int status_type)
 {
 	Octstr *reply;
 	if ((reply = httpd_check_authorization(cgivars, 1))!= NULL) return reply;
-	return octstr_create("Running");
+	return print_status(cgivars, status_type);
 }
 
 static struct httpd_command {
@@ -136,7 +136,7 @@ static struct httpd_command {
 	{ NULL , NULL } /* terminate list */
 };
 
-static char *status_linebreak(int status_type)
+char *status_linebreak(int status_type)
 {
 	switch (status_type) {
 		case STATUS_HTML:
