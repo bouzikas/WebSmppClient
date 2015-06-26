@@ -91,4 +91,6 @@ enum {
 char *status_linebreak(int status_type);
 int httpadmin_start(Cfg *config);
 void httpadmin_stop(void);
+
 Octstr *print_status(List *cgivars, int status_type);
+Octstr *print_homepage(List *cgivars, int status_type);

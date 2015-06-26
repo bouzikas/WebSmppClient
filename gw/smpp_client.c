@@ -201,6 +201,15 @@ Octstr *print_status(List *cgivars, int status_type)
 	return ret;
 }
 
+Octstr *print_homepage(List *cgivars, int status_type)
+{
+	Octstr *ret;
+	
+	
+	
+	return ret;
+}
+
 int main(int argc, char **argv)
 {
 	int cf_index;

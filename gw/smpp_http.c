@@ -85,6 +85,7 @@ static Octstr *ha_password;
 static Octstr *ha_status_pw;
 static Octstr *ha_allow_ip;
 static Octstr *ha_deny_ip;
+static Octstr *resources_path;
 
 /*
  * check if the password matches. Return NULL if
@@ -128,6 +129,15 @@ static Octstr *httpd_status(List *cgivars, int status_type)
 	return print_status(cgivars, status_type);
 }
 
+static Octstr *httpd_homepage(List *cgivars, int status_type)
+{
+	Octstr *reply;
+	
+	if ((reply = httpd_check_authorization(cgivars, 0))!= NULL) return reply;
+	
+	return print_homepage(cgivars, status_type);
+}
+
 static struct httpd_command {
 	const char *command;
 	Octstr * (*function)(List *cgivars, int status_type);
@@ -154,13 +164,30 @@ char *status_linebreak(int status_type)
 	}
 }
 
+static char *ext_content_type(Octstr *extension)
+{
+    char *content_type;
+    
+    if (octstr_str_compare(extension, "png") == 0 || octstr_str_compare(extension, "jpg") == 0) {
+        content_type = "image/png";
+    } else if (octstr_str_compare(extension, "css") == 0) {
+        content_type = "text/css";
+    } else {
+        content_type = "text/plain";
+    }
+    
+    return content_type;
+}
+
 static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 						Octstr *body, List *cgivars)
 {
 	Octstr *reply, *final_reply, *url;
+	Octstr *res_path;
 	char *content_type;
 	char *header, *footer;
 	int status_type;
+	int status_code = HTTP_OK;
 	int i;
 	long pos;
 	
@@ -178,12 +205,12 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 	} else if (http_type_accepted(headers, "text/xml")) {
 		status_type = STATUS_XML;
 		content_type = "text/xml";
-	} else if (http_type_accepted(headers, "text/plain")) {
-		status_type = STATUS_TEXT;
-		content_type = "text/plain";
-	} else {
+	} else if (http_type_accepted(headers, "application/json")) {
 		status_type = STATUS_JSON;
 		content_type = "application/json";
+    } else {
+		status_type = STATUS_TEXT;
+		content_type = "text/plain";
 	}
 	
 	/* kill '/cgi-bin' prefix */
@@ -193,57 +220,55 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 	else if (octstr_get_char(url, 0) == '/')
 		octstr_delete(url, 0, 1);
 	
-	/* look for type and kill it */
-	pos = octstr_search_char(url, '.', 0);
-	if (pos != -1) {
-		Octstr *tmp = octstr_copy(url, pos+1, octstr_len(url) - pos - 1);
-		octstr_delete(url, pos, octstr_len(url) - pos);
-		
-		if (octstr_str_compare(tmp, "txt") == 0)
-			status_type = STATUS_TEXT;
-		else if (octstr_str_compare(tmp, "html") == 0)
-			status_type = STATUS_HTML;
-		else if (octstr_str_compare(tmp, "xml") == 0)
-			status_type = STATUS_XML;
-		else if (octstr_str_compare(tmp, "wml") == 0)
-			status_type = STATUS_WML;
-		else if (octstr_str_compare(tmp, "json") == 0)
-			status_type = STATUS_JSON;
-		
-		octstr_destroy(tmp);
-	}
-	
-	for (i=0; httpd_commands[i].command != NULL; i++) {
+	for (i = 0; httpd_commands[i].command != NULL; i++) {
 		if (octstr_str_compare(url, httpd_commands[i].command) == 0) {
 			reply = httpd_commands[i].function(cgivars, status_type);
 			break;
 		}
 	}
 	
-	/* check if command found */
-	if (httpd_commands[i].command == NULL)
-	{
-		char *lb = status_linebreak(status_type);
+	/* check if it is a resource file, otherwise 404 not found */
+	if (httpd_commands[i].command == NULL) {
+		res_path = octstr_duplicate(resources_path);
+		octstr_append(res_path, url);
 		
-		reply = octstr_format("Unknown command `%S'.%sPossible commands are:%s",
-							  ourl, lb, lb);
-		
-		for (i=0; httpd_commands[i].command != NULL; i++)
-		{
-			octstr_format_append(reply, "%s%s", httpd_commands[i].command, lb);
+		if (access(octstr_get_cstr(res_path), F_OK) != -1) {
+			reply = octstr_read_file(octstr_get_cstr(res_path));
+			status_type = STATUS_TEXT;
+			
+            long pos = octstr_search_char(res_path, '.', octstr_len(res_path) - 5);
+			octstr_delete(res_path, 0, pos + 1);
+            
+            content_type = ext_content_type(res_path);
 		}
+		
+		header = "";
+		footer = "";
+		
+		if (reply == NULL) {
+		
+			status_code = HTTP_NOT_FOUND;
+			reply = octstr_format("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">\n"
+								   "<html><head>\n"
+								   "<title>404 Not Found</title>\n"
+								   "</head><body>\n"
+								   "<h1>Not Found</h1>\n"
+								   "<p>The requested URL %S was not found on this server.</p>\n"
+								   "</body></html>", ourl);
+		}
+		
+		goto finished;
 	}
-	
-	gw_assert(reply != NULL);
 	
 	if (status_type == STATUS_HTML) {
 		header = "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 3.2//EN\">\n"
-		"<head><meta charset=\"utf-8\"/>"
-		"<html>\n<title>" GW_NAME "</title>\n"
+		"<html>\n<head><meta charset=\"utf-8\"/>"
+		"<link rel='stylesheet' type='text/css' href='http://127.0.0.1:8000/css/bootstrap/css/bootstrap.min.css'>"
+		"<script type='text/javascript' src='http://127.0.0.1:8000/css/bootstrap/js/bootstrap.min.js'></script>"
+		"\n<title>" GW_NAME "</title>\n"
 		"</head><body>\n<p>";
 		footer = "</p>\n</body></html>\n";
 		content_type = "text/html";
-		
 	} else if (status_type == STATUS_WML) {
 		header = "<?xml version=\"1.0\"?>\n"
 		"<!DOCTYPE wml PUBLIC \"-//WAPFORUM//DTD WML 1.1//EN\" "
@@ -264,6 +289,10 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 		footer = "";
 		content_type = "text/plain";
 	}
+
+finished:
+	
+	gw_assert(reply != NULL);
 	final_reply = octstr_create(header);
 	octstr_append(final_reply, reply);
 	octstr_append_cstr(final_reply, footer);
@@ -272,12 +301,13 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 	headers = gwlist_create();
 	http_header_add(headers, "Content-Type", content_type);
 	
-	http_send_reply(client, HTTP_OK, headers, final_reply);
+	http_send_reply(client, status_code, headers, final_reply);
 	
 	octstr_destroy(url);
 	octstr_destroy(ourl);
 	octstr_destroy(body);
 	octstr_destroy(reply);
+    octstr_destroy(res_path);
 	octstr_destroy(final_reply);
 	http_destroy_headers(headers);
 	http_destroy_cgiargs(cgivars);
@@ -339,6 +369,7 @@ int httpadmin_start(Cfg *cfg)
 	
 	ha_allow_ip = cfg_get(grp, octstr_imm("admin-allow-ip"));
 	ha_deny_ip = cfg_get(grp, octstr_imm("admin-deny-ip"));
+	resources_path = cfg_get(grp, octstr_imm("store-location"));
 	
 #ifdef HAVE_LIBSSL
 	cfg_get_bool(&ssl, grp, octstr_imm("admin-port-ssl"));
@@ -384,6 +415,7 @@ void httpadmin_stop(void)
 	octstr_destroy(ha_status_pw);
 	octstr_destroy(ha_allow_ip);
 	octstr_destroy(ha_deny_ip);
+	octstr_destroy(resources_path);
 	ha_password = NULL;
 	ha_status_pw = NULL;
 	ha_allow_ip = NULL;
