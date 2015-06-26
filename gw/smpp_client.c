@@ -184,6 +184,10 @@ Octstr *print_status(List *cgivars, int status_type)
 	} else if (status_type == STATUS_XML) {
 		frmt = "<version>%s</version>\n <status>%s, uptime %ldd %ldh %ldm %lds</status>\n";
 		footer = "</p>";
+	} else if (status_type == STATUS_JSON) {
+		octstr_url_encode(version);
+		frmt = "\"version\":\"%s\",\"status\":\"%s\",\"uptime\":\"%ldd %ldh %ldm %lds\"";
+		footer = "";
 	} else {
 		frmt = "%s</p>\n\n <p>Status: %s, uptime %ldd %ldh %ldm %lds</p>\n\n";
 		footer = "";

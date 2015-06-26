@@ -147,6 +147,8 @@ char *status_linebreak(int status_type)
 			return "\n";
 		case STATUS_XML:
 			return "\n";
+		case STATUS_JSON:
+			return "\n";
 		default:
 			return NULL;
 	}
@@ -170,17 +172,18 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 	if (http_type_accepted(headers, "text/vnd.wap.wml")) {
 		status_type = STATUS_WML;
 		content_type = "text/vnd.wap.wml";
-	}
-	else if (http_type_accepted(headers, "text/html")) {
+	} else if (http_type_accepted(headers, "text/html")) {
 		status_type = STATUS_HTML;
 		content_type = "text/html";
-	}
-	else if (http_type_accepted(headers, "text/xml")) {
+	} else if (http_type_accepted(headers, "text/xml")) {
 		status_type = STATUS_XML;
 		content_type = "text/xml";
-	} else {
+	} else if (http_type_accepted(headers, "text/plain")) {
 		status_type = STATUS_TEXT;
 		content_type = "text/plain";
+	} else {
+		status_type = STATUS_JSON;
+		content_type = "application/json";
 	}
 	
 	/* kill '/cgi-bin' prefix */
@@ -204,6 +207,8 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 			status_type = STATUS_XML;
 		else if (octstr_str_compare(tmp, "wml") == 0)
 			status_type = STATUS_WML;
+		else if (octstr_str_compare(tmp, "json") == 0)
+			status_type = STATUS_JSON;
 		
 		octstr_destroy(tmp);
 	}
@@ -250,6 +255,10 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 		header = "<?xml version=\"1.0\"?>\n"
 		"<gateway>\n";
 		footer = "</gateway>\n";
+	} else if (status_type == STATUS_JSON) {
+		header = "{";
+		footer = "}";
+		content_type = "application/json";
 	} else {
 		header = "";
 		footer = "";

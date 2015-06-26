@@ -80,8 +80,9 @@ enum {
 enum {
     STATUS_HTML = 0,
     STATUS_TEXT = 1,
-    STATUS_WML = 2,
-    STATUS_XML = 3
+    STATUS_WML  = 2,
+    STATUS_XML  = 3,
+	STATUS_JSON = 4
 };
 
 /*---------------
