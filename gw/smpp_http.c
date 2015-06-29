@@ -143,6 +143,7 @@ static struct httpd_command {
 	Octstr * (*function)(List *cgivars, int status_type);
 } httpd_commands[] = {
 	{ "status", httpd_status },
+	{ "client", httpd_homepage },
 	{ NULL , NULL } /* terminate list */
 };
 
@@ -179,11 +180,27 @@ static char *ext_content_type(Octstr *extension)
     return content_type;
 }
 
+static Octstr *main_menu(const Octstr *active_tab)
+{
+	Octstr *menu, *href = NULL, *hlink = NULL;
+	const char *active_class = "class=\"active\"";
+	int k;
+	
+	menu = octstr_create("<div class=\"collapse navbar-collapse\" id=\"navbar\">"
+						 "<ul class=\"nav navbar-nav\">");
+	
+	for (k = 1; k < 2; k++) {
+		octstr_format_append(menu, "<li %s><a href=\"%s\">%s</a></li>", active_class, octstr_get_cstr(href), octstr_get_cstr(hlink));
+	}
+	
+	octstr_append_cstr(menu, "</ul></div>");
+}
+
 static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 						Octstr *body, List *cgivars)
 {
 	Octstr *reply, *final_reply, *url;
-	Octstr *res_path;
+	Octstr *res_path, *menu = NULL;
 	char *content_type;
 	char *header, *footer;
 	int status_type;
@@ -242,6 +259,7 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
             content_type = ext_content_type(res_path);
 		}
 		
+		octstr_destroy(res_path);
 		header = "";
 		footer = "";
 		
@@ -261,13 +279,54 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 	}
 	
 	if (status_type == STATUS_HTML) {
-		header = "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 3.2//EN\">\n"
-		"<html>\n<head><meta charset=\"utf-8\"/>"
-		"<link rel='stylesheet' type='text/css' href='http://127.0.0.1:8000/css/bootstrap/css/bootstrap.min.css'>"
-		"<script type='text/javascript' src='http://127.0.0.1:8000/css/bootstrap/js/bootstrap.min.js'></script>"
-		"\n<title>" GW_NAME "</title>\n"
-		"</head><body>\n<p>";
-		footer = "</p>\n</body></html>\n";
+		
+		Octstr *menu = main_menu(url);
+		
+		header = "<!DOCTYPE html>"
+					"<html lang=\"en\">"
+						"<head>"
+							"<meta charset=\"utf-8\">"
+							"<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">"
+							"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+							"<!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->"
+							"<title>Bootstrap 101 Template</title>"
+							""
+							"<!-- Bootstrap -->"
+							"<link href=\"http://127.0.0.1:8000/css/bootstrap/css/bootstrap.min.css\" rel=\"stylesheet\">"
+							""
+							"<!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->"
+							"<!-- WARNING: Respond.js doesn't work if you view the page via file:// -->"
+							"<!--[if lt IE 9]>"
+							"	<script src=\"https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js\"></script>"
+							"	<script src=\"https://oss.maxcdn.com/respond/1.4.2/respond.min.js\"></script>"
+							"<![endif]-->"
+						"</head>"
+					"<body>"
+					"<nav class=\"navbar navbar-default\">"
+						"<div class=\"container\">"
+							"<div class=\"navbar-header\">"
+								"<button aria-controls=\"navbar\" aria-expanded=\"false\" data-target=\"#navbar\" data-toggle=\"collapse\" class=\"navbar-toggle collapsed\" type=\"button\">"
+									"<span class=\"sr-only\">Toggle navigation</span>"
+									"<span class=\"icon-bar\"></span>"
+									"<span class=\"icon-bar\"></span>"
+									"<span class=\"icon-bar\"></span>"
+								"</button>"
+								"<a href=\"#\" class=\"navbar-brand\">" GW_NAME "</a>"
+							"</div>"
+							"%S"		// Here we add the menu
+						"</div>"
+					"</nav>"
+					"<div class=\"container\">"
+					"";
+		
+		footer =		""
+						"</div>"
+						"<!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->"
+						"<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js\"></script>"
+						"<!-- Include all compiled plugins (below), or include individual files as needed -->"
+						"<script src=\"http://127.0.0.1:8000/css/bootstrap/js/bootstrap.min.js\"></script>"
+					"</body>"
+				"</html>";
 		content_type = "text/html";
 	} else if (status_type == STATUS_WML) {
 		header = "<?xml version=\"1.0\"?>\n"
@@ -293,21 +352,20 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 finished:
 	
 	gw_assert(reply != NULL);
-	final_reply = octstr_create(header);
+	final_reply = octstr_format(header, menu);
 	octstr_append(final_reply, reply);
 	octstr_append_cstr(final_reply, footer);
 	
 	http_destroy_headers(headers);
 	headers = gwlist_create();
 	http_header_add(headers, "Content-Type", content_type);
-	
 	http_send_reply(client, status_code, headers, final_reply);
 	
 	octstr_destroy(url);
 	octstr_destroy(ourl);
 	octstr_destroy(body);
 	octstr_destroy(reply);
-    octstr_destroy(res_path);
+	octstr_destroy(menu);
 	octstr_destroy(final_reply);
 	http_destroy_headers(headers);
 	http_destroy_cgiargs(cgivars);

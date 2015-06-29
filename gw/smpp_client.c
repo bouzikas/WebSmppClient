@@ -176,7 +176,7 @@ Octstr *print_status(List *cgivars, int status_type)
 	version = version_report_string("");
 	
 	if (status_type == STATUS_HTML) {
-		frmt = "%s</p>\n\n <p>Status: %s, uptime %ldd %ldh %ldm %lds</p>\n\n";
+		frmt = "<div class=\"jumbotron\"><p>%s</p>\n\n <p>Status: %s, uptime %ldd %ldh %ldm %lds</p>\n\n";
 		footer = "</p>";
 	} else if (status_type == STATUS_WML) {
 		frmt = "%s</p>\n\n <p>Status: %s, uptime %ldd %ldh %ldm %lds</p>\n\n";
@@ -205,7 +205,7 @@ Octstr *print_homepage(List *cgivars, int status_type)
 {
 	Octstr *ret;
 	
-	
+	ret = octstr_create("<div class=\"jumbotron\">HOMEPAGE</div>");
 	
 	return ret;
 }
