@@ -250,6 +250,7 @@ int main(int argc, char **argv)
 	
 	client_status = DEAD;
 	mutex_destroy(status_mutex);
+	httpadmin_stop();
 	
 	alog_close();		/* if we have any */
 	cfg_destroy(cfg);

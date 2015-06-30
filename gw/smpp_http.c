@@ -149,6 +149,21 @@ static Octstr *httpd_homepage(List *cgivars, int status_type)
 	return print_homepage(cgivars, status_type);
 }
 
+static Octstr *httpd_shutdown(List *cgivars, int status_type)
+{
+	Octstr *reply;
+	
+	if ((reply = httpd_check_authorization(cgivars, 0))!= NULL) return reply;
+	
+	if (client_status == SHUTDOWN) {
+		return octstr_create("System is shuting down. Please wait...");
+	}
+	
+	client_status = SHUTDOWN;
+	
+	return octstr_create("Bringing system down....");
+}
+
 static struct httpd_command {
 	const char *href;
 	const char *hlink;
@@ -157,6 +172,7 @@ static struct httpd_command {
 } httpd_commands[] = {
 	{ "/status", "Status", "status", httpd_status },
 	{ "/client", "Client", "client", httpd_homepage },
+	{ "/shutdown", "Shutdown", "shutdown", httpd_shutdown },
 	{ NULL , NULL } /* terminate list */
 };
 
@@ -439,7 +455,7 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 					"</nav>"
 					"<div class=\"container\">"
 					"";
-		
+	
 		footer =		""
 						"</div>"
 						"<!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->"
