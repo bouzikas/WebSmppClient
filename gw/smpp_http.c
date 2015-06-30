@@ -68,6 +68,9 @@
 #include <signal.h>
 #include <unistd.h>
 
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include "gwlib/gwlib.h"
 #include "smpp_client.h"
 
@@ -86,6 +89,14 @@ static Octstr *ha_status_pw;
 static Octstr *ha_allow_ip;
 static Octstr *ha_deny_ip;
 static Octstr *resources_path;
+
+/* variables to track http calls in order to cache resource requests */
+static Dict *http_calls;
+static Mutex *http_calls_lock;
+
+typedef struct Resource {
+	Octstr *last_modified;
+} Resource;
 
 /*
  * check if the password matches. Return NULL if
@@ -205,11 +216,93 @@ static Octstr *main_menu(const Octstr *active_tab)
 	return menu;
 }
 
+static Octstr *file_last_modified(char *filepath)
+{
+	struct stat attrib;
+	char date[40];
+	struct tm tm;
+	Octstr *date_modified = NULL;
+	
+	stat(filepath, &attrib);
+	tm = gw_localtime(attrib.st_ctime);
+	
+	gw_strftime(date, 40, "%a, %d %b %Y %H:%M:%S %Z", &tm);
+	
+	date_modified = octstr_create(date);
+	date[0] = 0;
+	
+	return date_modified;
+}
+
+static void http_calls_destroy(void)
+{
+	dict_destroy(http_calls);
+	mutex_destroy(http_calls_lock);
+}
+
+static void http_calls_res_destroy(void *item)
+{
+	Resource *res = (void *)item;
+	
+	if (res == NULL) {
+		return;
+	}
+	
+	if (res->last_modified) {
+		octstr_destroy(res->last_modified);
+	}
+	
+	res->last_modified = NULL;
+	
+	gw_free(res);
+}
+
+static void http_calls_init(void)
+{
+	http_calls = dict_create(1024, http_calls_res_destroy);
+	http_calls_lock = mutex_create();
+}
+
+static inline Octstr *http_call_key(Octstr *ip, Octstr *file)
+{
+	return octstr_format("%S:%S", ip, file);
+}
+
+static Resource *http_calls_get(Octstr *ip, Octstr *file)
+{
+	Octstr *key;
+	List *list = NULL;
+	Resource *res = NULL;
+	
+	key = http_call_key(ip, file);
+	mutex_lock(http_calls_lock);
+	res = dict_get(http_calls, key);
+	mutex_unlock(http_calls_lock);
+	
+	return res;
+}
+
+static void http_calls_put(Octstr *ip, Octstr *file, Resource *resource)
+{
+	Octstr *key;
+	List *list;
+	Resource *res;
+	
+	key = http_call_key(ip, file);
+	mutex_lock(http_calls_lock);
+	res = dict_get(http_calls, key);
+	if (res == NULL) {
+		dict_put(http_calls, key, resource);
+	}
+	mutex_unlock(http_calls_lock);
+}
+
+
 static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
-						Octstr *body, List *cgivars)
+						Octstr *body, List *cgivars, Octstr *ip)
 {
 	Octstr *reply, *final_reply, *url;
-	Octstr *res_path, *menu = NULL;
+	Octstr *res_path, *menu = NULL, *last_modified = NULL;
 	char *content_type;
 	char *header, *footer;
 	int status_type;
@@ -253,7 +346,7 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 		}
 	}
 	
-	/* check if it is a resource file, otherwise 404 not found */
+	/* check if it is a resource file or if not exist retur `404 not found' */
 	if (httpd_commands[i].command == NULL) {
 		res_path = octstr_duplicate(resources_path);
 		octstr_append(res_path, url);
@@ -262,9 +355,26 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 			reply = octstr_read_file(octstr_get_cstr(res_path));
 			status_type = STATUS_TEXT;
 			
+			Resource *res = NULL;
+			
+			res = http_calls_get(ip, res_path);
+			
+			last_modified = file_last_modified(octstr_get_cstr(res_path));
+			if (res != NULL) {
+				if (octstr_compare(res->last_modified, last_modified) == 0) {
+					status_code = HTTP_NOT_MODIFIED;
+				} else {
+					res->last_modified = octstr_duplicate(last_modified);
+				}
+			} else {
+				res = gw_malloc(sizeof(*res));
+				res->last_modified = octstr_duplicate(last_modified);
+				http_calls_put(ip, res_path, res);
+			}
+			
             long pos = octstr_search_char(res_path, '.', octstr_len(res_path) - 5);
 			octstr_delete(res_path, 0, pos + 1);
-            
+			
             content_type = ext_content_type(res_path);
 		}
 		
@@ -298,7 +408,7 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 							"<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">"
 							"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
 							"<!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->"
-							"<title>Bootstrap 101 Template</title>"
+							"<title>" GW_NAME " v." GW_VERSION " </title>"
 							""
 							"<!-- Bootstrap -->"
 							"<link href=\"http://127.0.0.1:8000/css/bootstrap/css/bootstrap.min.css\" rel=\"stylesheet\">"
@@ -367,14 +477,20 @@ finished:
 	
 	http_destroy_headers(headers);
 	headers = gwlist_create();
+	
+	if (last_modified != NULL) {
+		http_header_add(headers, "Last-Modified", octstr_get_cstr(last_modified));
+	}
+	
 	http_header_add(headers, "Content-Type", content_type);
 	http_send_reply(client, status_code, headers, final_reply);
-	
+
 	octstr_destroy(url);
 	octstr_destroy(ourl);
 	octstr_destroy(body);
 	octstr_destroy(reply);
 	octstr_destroy(menu);
+	octstr_destroy(last_modified);
 	octstr_destroy(final_reply);
 	http_destroy_headers(headers);
 	http_destroy_cgiargs(cgivars);
@@ -398,7 +514,7 @@ static void httpadmin_run(void *arg)
 			http_close_client(client);
 			continue;
 		}
-		httpd_serve(client, url, headers, body, cgivars);
+		httpd_serve(client, url, headers, body, cgivars, ip);
 		octstr_destroy(ip);
 	}
 	
@@ -465,6 +581,8 @@ int httpadmin_start(Cfg *cfg)
 	
 	http_open_port_if(ha_port, ssl, ha_interface);
 	
+	http_calls_init();
+	
 	if (gwthread_create(httpadmin_run, NULL) == -1)
 		panic(0, "Failed to start a new thread for HTTP admin");
 	
@@ -475,6 +593,8 @@ int httpadmin_start(Cfg *cfg)
 
 void httpadmin_stop(void)
 {
+	http_calls_destroy();
+	
 	http_close_all_ports();
 	gwthread_join_every(httpadmin_run);
 	octstr_destroy(ha_interface);
