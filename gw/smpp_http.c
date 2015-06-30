@@ -139,11 +139,13 @@ static Octstr *httpd_homepage(List *cgivars, int status_type)
 }
 
 static struct httpd_command {
+	const char *href;
+	const char *hlink;
 	const char *command;
 	Octstr * (*function)(List *cgivars, int status_type);
 } httpd_commands[] = {
-	{ "status", httpd_status },
-	{ "client", httpd_homepage },
+	{ "/status", "Status", "status", httpd_status },
+	{ "/client", "Client", "client", httpd_homepage },
 	{ NULL , NULL } /* terminate list */
 };
 
@@ -184,16 +186,23 @@ static Octstr *main_menu(const Octstr *active_tab)
 {
 	Octstr *menu, *href = NULL, *hlink = NULL;
 	const char *active_class = "class=\"active\"";
-	int k;
+	int i;
 	
 	menu = octstr_create("<div class=\"collapse navbar-collapse\" id=\"navbar\">"
 						 "<ul class=\"nav navbar-nav\">");
 	
-	for (k = 1; k < 2; k++) {
-		octstr_format_append(menu, "<li %s><a href=\"%s\">%s</a></li>", active_class, octstr_get_cstr(href), octstr_get_cstr(hlink));
+	for (i = 0; httpd_commands[i].href != NULL; i++) {
+		if (octstr_str_compare(active_tab, httpd_commands[i].command) == 0) {
+			octstr_format_append(menu, "<li %s>", active_class);
+		} else {
+			octstr_append_cstr(menu, "<li>");
+		}
+		octstr_format_append(menu, "<a href=\"%s\">%s</a></li>", httpd_commands[i].href, httpd_commands[i].hlink);
 	}
 	
 	octstr_append_cstr(menu, "</ul></div>");
+	
+	return menu;
 }
 
 static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
@@ -280,7 +289,7 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 	
 	if (status_type == STATUS_HTML) {
 		
-		Octstr *menu = main_menu(url);
+		menu = main_menu(url);
 		
 		header = "<!DOCTYPE html>"
 					"<html lang=\"en\">"
@@ -313,7 +322,7 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 								"</button>"
 								"<a href=\"#\" class=\"navbar-brand\">" GW_NAME "</a>"
 							"</div>"
-							"%S"		// Here we add the menu
+							"%s"		// Here we add the menu
 						"</div>"
 					"</nav>"
 					"<div class=\"container\">"
@@ -352,7 +361,7 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 finished:
 	
 	gw_assert(reply != NULL);
-	final_reply = octstr_format(header, menu);
+	final_reply = octstr_format(header, octstr_get_cstr(menu));
 	octstr_append(final_reply, reply);
 	octstr_append_cstr(final_reply, footer);
 	
