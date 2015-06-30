@@ -214,9 +214,22 @@ static Octstr *main_menu(const Octstr *active_tab)
 	Octstr *menu, *href = NULL, *hlink = NULL;
 	const char *active_class = "class=\"active\"";
 	int i;
-	
-	menu = octstr_create("<div class=\"collapse navbar-collapse\" id=\"navbar\">"
-						 "<ul class=\"nav navbar-nav\">");
+
+	menu = octstr_create(""
+		"<nav class=\"navbar navbar-default\">"
+			"<div class=\"container\">"
+				"<div class=\"navbar-header\">"
+					"<button aria-controls=\"navbar\" aria-expanded=\"false\" data-target=\"#navbar\" "
+						"data-toggle=\"collapse\" class=\"navbar-toggle collapsed\" type=\"button\">"
+						"<span class=\"sr-only\">Toggle navigation</span>"
+						"<span class=\"icon-bar\"></span>"
+						"<span class=\"icon-bar\"></span>"
+						"<span class=\"icon-bar\"></span>"
+					"</button>"
+					"<a href=\"#\" class=\"navbar-brand\">" GW_NAME "</a>"
+				"</div>"
+				"<div class=\"collapse navbar-collapse\" id=\"navbar\">"
+					"<ul class=\"nav navbar-nav\">");
 	
 	for (i = 0; httpd_commands[i].href != NULL; i++) {
 		if (octstr_str_compare(active_tab, httpd_commands[i].command) == 0) {
@@ -227,7 +240,11 @@ static Octstr *main_menu(const Octstr *active_tab)
 		octstr_format_append(menu, "<a href=\"%s\">%s</a></li>", httpd_commands[i].href, httpd_commands[i].hlink);
 	}
 	
-	octstr_append_cstr(menu, "</ul></div>");
+	octstr_append_cstr(menu,
+					"</ul>"
+				"</div>"
+			"</div>"
+		"</nav>");
 	
 	return menu;
 }
@@ -321,7 +338,7 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 	Octstr *res_path, *menu = NULL, *last_modified = NULL;
 	Octstr *user_agent = NULL;
 	char *content_type;
-	char *header, *footer;
+	char *header, *container, *footer;
 	int status_type;
 	int status_code = HTTP_OK;
 	int i;
@@ -397,8 +414,11 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 		}
 		
 		octstr_destroy(res_path);
+		
 		header = "";
+		container = "";
 		footer = "";
+		menu = octstr_create("");
 		
 		if (reply == NULL) {
 		
@@ -438,50 +458,27 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 							"	<script src=\"https://oss.maxcdn.com/respond/1.4.2/respond.min.js\"></script>"
 							"<![endif]-->"
 						"</head>"
-					"<body>"
-					"<nav class=\"navbar navbar-default\">"
-						"<div class=\"container\">"
-							"<div class=\"navbar-header\">"
-								"<button aria-controls=\"navbar\" aria-expanded=\"false\" data-target=\"#navbar\" data-toggle=\"collapse\" class=\"navbar-toggle collapsed\" type=\"button\">"
-									"<span class=\"sr-only\">Toggle navigation</span>"
-									"<span class=\"icon-bar\"></span>"
-									"<span class=\"icon-bar\"></span>"
-									"<span class=\"icon-bar\"></span>"
-								"</button>"
-								"<a href=\"#\" class=\"navbar-brand\">" GW_NAME "</a>"
-							"</div>"
-							"%s"		// Here we add the menu
-						"</div>"
-					"</nav>"
-					"<div class=\"container\">"
-					"";
+						"<body>";
 	
-		footer =		""
-						"</div>"
-						"<!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->"
-						"<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js\"></script>"
-						"<!-- Include all compiled plugins (below), or include individual files as needed -->"
-						"<script src=\"http://127.0.0.1:8000/css/bootstrap/js/bootstrap.min.js\"></script>"
-					"</body>"
-				"</html>";
+		container =		"<div class=\"container\">";
+		
+		footer =		"</div>"
+							"<!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->"
+							"<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js\"></script>"
+							"<!-- Include all compiled plugins (below), or include individual files as needed -->"
+							"<script src=\"http://127.0.0.1:8000/css/bootstrap/js/bootstrap.min.js\"></script>"
+						"</body>"
+					"</html>";
+		
 		content_type = "text/html";
-	} else if (status_type == STATUS_WML) {
-		header = "<?xml version=\"1.0\"?>\n"
-		"<!DOCTYPE wml PUBLIC \"-//WAPFORUM//DTD WML 1.1//EN\" "
-		"\"http://www.wapforum.org/DTD/wml_1.1.xml\">\n"
-		"\n<wml>\n <card>\n  <p>";
-		footer = "  </p>\n </card>\n</wml>\n";
-		content_type = "text/vnd.wap.wml";
-	} else if (status_type == STATUS_XML) {
-		header = "<?xml version=\"1.0\"?>\n"
-		"<gateway>\n";
-		footer = "</gateway>\n";
 	} else if (status_type == STATUS_JSON) {
 		header = "{";
+		container = "";
 		footer = "}";
 		content_type = "application/json";
 	} else {
 		header = "";
+		container = "";
 		footer = "";
 		content_type = "text/plain";
 	}
@@ -489,7 +486,8 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 finished:
 	
 	gw_assert(reply != NULL);
-	final_reply = octstr_format(header, octstr_get_cstr(menu));
+	final_reply = octstr_format("%s%s", header, octstr_get_cstr(menu));
+	octstr_append_cstr(final_reply, container);
 	octstr_append(final_reply, reply);
 	octstr_append_cstr(final_reply, footer);
 	
