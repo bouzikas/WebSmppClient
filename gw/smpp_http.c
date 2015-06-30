@@ -263,18 +263,18 @@ static void http_calls_init(void)
 	http_calls_lock = mutex_create();
 }
 
-static inline Octstr *http_call_key(Octstr *ip, Octstr *file)
+static inline Octstr *http_call_key(Octstr *ip, Octstr *file, Octstr *user_agent)
 {
-	return octstr_format("%S:%S", ip, file);
+	return octstr_format("%S:%S:%S", ip, file, user_agent);
 }
 
-static Resource *http_calls_get(Octstr *ip, Octstr *file)
+static Resource *http_calls_get(Octstr *ip, Octstr *file, Octstr *user_agent)
 {
 	Octstr *key;
 	List *list = NULL;
 	Resource *res = NULL;
 	
-	key = http_call_key(ip, file);
+	key = http_call_key(ip, file, user_agent);
 	mutex_lock(http_calls_lock);
 	res = dict_get(http_calls, key);
 	mutex_unlock(http_calls_lock);
@@ -282,13 +282,13 @@ static Resource *http_calls_get(Octstr *ip, Octstr *file)
 	return res;
 }
 
-static void http_calls_put(Octstr *ip, Octstr *file, Resource *resource)
+static void http_calls_put(Octstr *ip, Octstr *file, Resource *resource, Octstr *user_agent)
 {
 	Octstr *key;
 	List *list;
 	Resource *res;
 	
-	key = http_call_key(ip, file);
+	key = http_call_key(ip, file, user_agent);
 	mutex_lock(http_calls_lock);
 	res = dict_get(http_calls, key);
 	if (res == NULL) {
@@ -303,6 +303,7 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 {
 	Octstr *reply, *final_reply, *url;
 	Octstr *res_path, *menu = NULL, *last_modified = NULL;
+	Octstr *user_agent = NULL;
 	char *content_type;
 	char *header, *footer;
 	int status_type;
@@ -357,7 +358,8 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 			
 			Resource *res = NULL;
 			
-			res = http_calls_get(ip, res_path);
+			user_agent = http_header_value(headers, octstr_imm("User-Agent"));
+			res = http_calls_get(ip, res_path, user_agent);
 			
 			last_modified = file_last_modified(octstr_get_cstr(res_path));
 			if (res != NULL) {
@@ -369,7 +371,7 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 			} else {
 				res = gw_malloc(sizeof(*res));
 				res->last_modified = octstr_duplicate(last_modified);
-				http_calls_put(ip, res_path, res);
+				http_calls_put(ip, res_path, res, user_agent);
 			}
 			
             long pos = octstr_search_char(res_path, '.', octstr_len(res_path) - 5);
@@ -492,6 +494,7 @@ finished:
 	octstr_destroy(menu);
 	octstr_destroy(last_modified);
 	octstr_destroy(final_reply);
+	octstr_destroy(user_agent);
 	http_destroy_headers(headers);
 	http_destroy_cgiargs(cgivars);
 }
