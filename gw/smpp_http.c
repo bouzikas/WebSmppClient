@@ -78,6 +78,9 @@
 
 extern volatile sig_atomic_t client_status;
 
+
+extern Octstr *resources_path;
+
 /* our own thingies */
 
 static volatile sig_atomic_t httpadmin_running;
@@ -88,7 +91,6 @@ static Octstr *ha_password;
 static Octstr *ha_status_pw;
 static Octstr *ha_allow_ip;
 static Octstr *ha_deny_ip;
-static Octstr *resources_path;
 
 /* variables to track http calls in order to cache resource requests */
 static Dict *http_calls;
@@ -569,7 +571,6 @@ int httpadmin_start(Cfg *cfg)
 	
 	ha_allow_ip = cfg_get(grp, octstr_imm("admin-allow-ip"));
 	ha_deny_ip = cfg_get(grp, octstr_imm("admin-deny-ip"));
-	resources_path = cfg_get(grp, octstr_imm("store-location"));
 	
 #ifdef HAVE_LIBSSL
 	cfg_get_bool(&ssl, grp, octstr_imm("admin-port-ssl"));
@@ -619,7 +620,7 @@ void httpadmin_stop(void)
 	octstr_destroy(ha_status_pw);
 	octstr_destroy(ha_allow_ip);
 	octstr_destroy(ha_deny_ip);
-	octstr_destroy(resources_path);
+	
 	ha_password = NULL;
 	ha_status_pw = NULL;
 	ha_allow_ip = NULL;

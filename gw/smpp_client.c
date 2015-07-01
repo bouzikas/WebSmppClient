@@ -79,6 +79,9 @@
 /* configuration filename */
 Octstr *cfg_filename;
 
+/* Path to resource folder needed for web interface */
+Octstr *resources_path;
+
 volatile sig_atomic_t client_status;
 
 /* own global variables */
@@ -146,6 +149,11 @@ static void setup_signal_handlers(void)
 
 static Cfg *init_client(Cfg *cfg)
 {
+	CfgGroup *grp;
+	
+	grp = cfg_get_single_group(cfg, octstr_imm("core"));
+	resources_path = cfg_get(grp, octstr_imm("store-location"));
+	
 	status_mutex = mutex_create();
 	
 	setup_signal_handlers();
@@ -203,9 +211,20 @@ Octstr *print_status(List *cgivars, int status_type)
 
 Octstr *print_homepage(List *cgivars, int status_type)
 {
-	Octstr *ret;
+	static char *client_html = "templates/client.html";
+	Octstr *ret = NULL, *resource_file;
 	
-	ret = octstr_create("<div class=\"jumbotron\">HOMEPAGE</div>");
+	resource_file = octstr_duplicate(resources_path);
+	octstr_append_cstr(resource_file, client_html);
+	
+	if (access(octstr_get_cstr(resource_file), F_OK) != -1) {
+		ret = octstr_read_file(octstr_get_cstr(resource_file));
+	} else {
+		ret = octstr_create("");
+		error(0, "Template file not found. Can't open file: %s", octstr_get_cstr(resource_file));
+	}
+	
+	octstr_destroy(resource_file);
 	
 	return ret;
 }
@@ -255,6 +274,7 @@ int main(int argc, char **argv)
 	alog_close();		/* if we have any */
 	cfg_destroy(cfg);
 	octstr_destroy(cfg_filename);
+	octstr_destroy(resources_path);
 	gwlib_shutdown();
 	
 	return 0;
