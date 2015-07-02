@@ -166,6 +166,30 @@ static Octstr *httpd_shutdown(List *cgivars, int status_type)
 	return octstr_create("Bringing system down....");
 }
 
+static Octstr *httpd_connect(List *cgivars, int status_type)
+{
+	Octstr *reply;
+	Octstr *smsc_id, *host, *sys_type, *system_id, *passwd;
+	
+	if ((reply = httpd_check_authorization(cgivars, 0))!= NULL) return reply;
+	
+	/* check if the smsc id is given */
+	smsc_id = http_cgi_variable(cgivars, "smsc_id");
+	host = http_cgi_variable(cgivars, "host");
+	sys_type = http_cgi_variable(cgivars, "sys_type");
+	system_id = http_cgi_variable(cgivars, "username");
+	passwd = http_cgi_variable(cgivars, "passwd");
+	
+	if (octstr_len(smsc_id) > 0
+		&& octstr_len(host) > 0
+		&& octstr_len(sys_type) > 0
+		&& octstr_len(system_id) > 0
+		&& octstr_len(passwd) > 0) {
+		return octstr_create("\"status\":\"Connecting...\"");
+	} else
+		return octstr_create("\"error\":\"Parameters are missing.\"");
+}
+
 static struct httpd_command {
 	const char *href;
 	const char *hlink;
@@ -175,6 +199,7 @@ static struct httpd_command {
 	{ "/status", "Status", "status", httpd_status },
 	{ "/client", "Client", "client", httpd_homepage },
 	{ "/shutdown", "Shutdown", "shutdown", httpd_shutdown },
+	{ "/connect", NULL, "connect", httpd_connect },
 	{ NULL , NULL } /* terminate list */
 };
 
@@ -234,12 +259,14 @@ static Octstr *main_menu(const Octstr *active_tab)
 					"<ul class=\"nav navbar-nav\">");
 	
 	for (i = 0; httpd_commands[i].href != NULL; i++) {
-		if (octstr_str_compare(active_tab, httpd_commands[i].command) == 0) {
-			octstr_format_append(menu, "<li %s>", active_class);
-		} else {
-			octstr_append_cstr(menu, "<li>");
+		if (httpd_commands[i].hlink != NULL) {
+			if (octstr_str_compare(active_tab, httpd_commands[i].command) == 0) {
+				octstr_format_append(menu, "<li %s>", active_class);
+			} else {
+				octstr_append_cstr(menu, "<li>");
+			}
+			octstr_format_append(menu, "<a href=\"%s\">%s</a></li>", httpd_commands[i].href, httpd_commands[i].hlink);
 		}
-		octstr_format_append(menu, "<a href=\"%s\">%s</a></li>", httpd_commands[i].href, httpd_commands[i].hlink);
 	}
 	
 	octstr_append_cstr(menu,
@@ -476,6 +503,7 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 					"<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js\"></script>"
 					"<!-- Include all compiled plugins (below), or include individual files as needed -->"
 					"<script src=\"http://127.0.0.1:8000/css/bootstrap/js/bootstrap.min.js\"></script>"
+					"<script src=\"http://127.0.0.1:8000/js/client.js\"></script>"
 				"</body>"
 			"</html>";
 		
@@ -485,11 +513,13 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 		container = "";
 		footer = "}";
 		content_type = "application/json";
+		menu = octstr_create("");
 	} else {
 		header = "";
 		container = "";
 		footer = "";
 		content_type = "text/plain";
+		menu = octstr_create("");
 	}
 
 finished:
