@@ -4,13 +4,13 @@
 			<h3 class="panel-title">SMPP Connection Details</h3>
 		</div>
 		<div class="panel-body">
-			<input type="text" placeholder="smsc-id" class="form-control" id="smsc_id" name="smsc_id"/><br>
-			<input type="text" placeholder="host" class="form-control" name="host" id="host"/><br>
-			<input type="text" placeholder="port" class="form-control" name="port" id="port"/><br>
-			<input type="text" placeholder="receiver-port" class="form-control" name="receiver_port" id="receiver_port"/><br>
-			<input type="text" placeholder="username" class="form-control" name="username" id="username"/><br>
-			<input type="password" placeholder="passwd" class="form-control" name="passwd" id="passwd"/><br>
-			<input type="text" placeholder="sys-type" class="form-control" name="sys_type" id="sys_type"/><br>
+			<p><input type="text" placeholder="smsc-id" class="form-control" id="smsc_id" name="smsc_id"/></p>
+			<p><input type="text" placeholder="host" class="form-control" name="host" id="host"/></p>
+			<p><input type="text" placeholder="port" class="form-control" name="port" id="port"/></p>
+			<p><input type="text" placeholder="receiver-port" class="form-control" name="receiver_port" id="receiver_port"/></p>
+			<p><input type="text" placeholder="username" class="form-control" name="username" id="username"/></p>
+			<p><input type="password" placeholder="passwd" class="form-control" name="passwd" id="passwd"/></p>
+			<p><input type="text" placeholder="sys-type" class="form-control" name="sys_type" id="sys_type"/></p>
 			<button class="btn btn-primary" id="connBtn" type="button">Connect</button>
 			<button class="btn btn-danger" id="discBtn" type="button">Disconnect</button>
 		</div>
@@ -23,21 +23,23 @@
 			<h3 class="panel-title">Send message</h3>
 		</div>
 		<div class="panel-body">
-			<input type="text" placeholder="sender" class="form-control" id="sender" name="sender"/><br>
-			<input type="text" placeholder="receiver" class="form-control" id="receiver" name="receiver"/><br>
-			<select class="form-control" id="data_coding" name="data_coding">
-				<option>Data Coding</option>
-				<option value="0">0</option>
-				<option value="1">1</option>
-				<option value="2">2</option>
-				<option value="3">3</option>
-				<option value="4">4</option>
-				<option value="5">5</option>
-				<option value="6">6</option>
-				<option value="7">7</option>
-				<option value="8">8</option>
-			</select><br>
-			<textarea id="message" class="form-control"></textarea><br>
+			<p><input type="text" placeholder="sender" class="form-control" id="sender" name="sender"/></p>
+			<p><input type="text" placeholder="receiver" class="form-control" id="receiver" name="receiver"/></p>
+			<p>
+				<select class="form-control" id="data_coding" name="data_coding">
+					<option>Data Coding</option>
+					<option value="0">0</option>
+					<option value="1">1</option>
+					<option value="2">2</option>
+					<option value="3">3</option>
+					<option value="4">4</option>
+					<option value="5">5</option>
+					<option value="6">6</option>
+					<option value="7">7</option>
+					<option value="8">8</option>
+				</select>
+			</p>
+			<p><textarea id="message" class="form-control"></textarea></p>
 			<button class="btn btn-success" id="sendBtn" type="button">Send Message</button>
 		</div>
 	</div>

@@ -453,6 +453,7 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 							"<!-- Bootstrap -->"
 							"<link href=\"http://127.0.0.1:8000/css/bootstrap/css/bootstrap.min.css\" rel=\"stylesheet\">"
 							"<link href=\"http://127.0.0.1:8000/css/bootstrap/css/bootstrap-theme.min.css\" rel=\"stylesheet\">"
+							"<link href=\"http://127.0.0.1:8000/css/style.css\" rel=\"stylesheet\">"
 							""
 							"<!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->"
 							"<!-- WARNING: Respond.js doesn't work if you view the page via file:// -->"
@@ -463,15 +464,20 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 						"</head>"
 						"<body>";
 	
-		container =		"<div class=\"container\">";
+		container =	"<div class=\"container\">";
 		
-		footer =		"</div>"
-							"<!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->"
-							"<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js\"></script>"
-							"<!-- Include all compiled plugins (below), or include individual files as needed -->"
-							"<script src=\"http://127.0.0.1:8000/css/bootstrap/js/bootstrap.min.js\"></script>"
-						"</body>"
-					"</html>";
+		footer = "</div>"
+					"<footer class=\"footer\">"
+						"<div class=\"container\">"
+							"<p>" GW_NAME " v." GW_VERSION " | Copyright 2015 &copy Dimitris Bouzikas</p>"
+						"</div>"
+					"</footer>"
+					"<!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->"
+					"<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js\"></script>"
+					"<!-- Include all compiled plugins (below), or include individual files as needed -->"
+					"<script src=\"http://127.0.0.1:8000/css/bootstrap/js/bootstrap.min.js\"></script>"
+				"</body>"
+			"</html>";
 		
 		content_type = "text/html";
 	} else if (status_type == STATUS_JSON) {
