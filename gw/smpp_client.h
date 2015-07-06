@@ -85,6 +85,16 @@ enum {
 	STATUS_JSON = 4
 };
 
+typedef struct {
+	Octstr *smpp_id;
+	Octstr *smpp_host;
+	Octstr *sys_type;
+	Octstr *system_id;
+	Octstr *passwd;
+	long transmit_port;
+	int receiver_port;
+} SmppConn;
+
 /*---------------
  * smpp_http.c (HTTP Admin)
  */
@@ -94,3 +104,4 @@ void httpadmin_stop(void);
 
 Octstr *print_status(List *cgivars, int status_type);
 Octstr *print_homepage(List *cgivars, int status_type);
+Octstr *smpp_connect(SmppConn *smpp_conn);

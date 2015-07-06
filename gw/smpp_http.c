@@ -185,7 +185,19 @@ static Octstr *httpd_connect(List *cgivars, int status_type)
 		&& octstr_len(sys_type) > 0
 		&& octstr_len(system_id) > 0
 		&& octstr_len(passwd) > 0) {
-		return octstr_create("\"status\":\"Connecting...\"");
+		
+		SmppConn *smpp_conn;
+		smpp_conn = gw_malloc(sizeof(SmppConn));
+		
+		smpp_conn->smpp_id = octstr_duplicate(smsc_id);
+		smpp_conn->smpp_host = octstr_duplicate(host);
+		smpp_conn->sys_type = octstr_duplicate(sys_type);
+		smpp_conn->system_id = octstr_duplicate(system_id);
+		smpp_conn->passwd = octstr_duplicate(passwd);
+		smpp_conn->transmit_port = atoi(octstr_get_cstr(http_cgi_variable(cgivars, "port")));
+		smpp_conn->receiver_port = atoi(octstr_get_cstr(http_cgi_variable(cgivars, "receiver_port")));
+		
+		return smpp_connect(smpp_conn);
 	} else
 		return octstr_create("\"error\":\"Parameters are missing.\"");
 }

@@ -229,6 +229,11 @@ Octstr *print_homepage(List *cgivars, int status_type)
 	return ret;
 }
 
+Octstr *smpp_connect(SmppConn *smpp_conn)
+{
+	return octstr_create("\"status\":\"Connecting...\"");
+}
+
 int main(int argc, char **argv)
 {
 	int cf_index;
