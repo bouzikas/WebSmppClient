@@ -76,6 +76,8 @@
 #include "shared.h"
 #include "load.h"
 
+#include "smsc/smpp_pdu.h"
+
 /* configuration filename */
 Octstr *cfg_filename;
 
@@ -88,6 +90,13 @@ volatile sig_atomic_t client_status;
 
 static Mutex *status_mutex;
 static time_t start_time;
+
+int fd_smpp_connect;
+static conn_ready = 0;
+
+static SMSCConn *conn;
+static Octstr *smpp_status = NULL;
+Counter *split_msg_counter;
 
 /*-------------------------------------------------------
  * signals
@@ -217,6 +226,10 @@ Octstr *print_homepage(List *cgivars, int status_type)
 	resource_file = octstr_duplicate(resources_path);
 	octstr_append_cstr(resource_file, client_html);
 	
+	if (conn != NULL && smscconn_status(conn) != SMSCCONN_DEAD) {
+		debug("", 0, "Connection is alive");
+	}
+	
 	if (access(octstr_get_cstr(resource_file), F_OK) != -1) {
 		ret = octstr_read_file(octstr_get_cstr(resource_file));
 	} else {
@@ -229,9 +242,129 @@ Octstr *print_homepage(List *cgivars, int status_type)
 	return ret;
 }
 
+static void smpp_client_connect(void *arg)
+{
+    int ret;
+    long len;
+    long pending_submits;
+    char *conn_error;
+    double timeout;
+//    int transmit_port;
+//    int receiver_port;
+    Octstr *transmit_port, *receiver_port, *transportation_type;
+	
+    Cfg *cfg;
+    CfgGroup *grp;
+//    SMSCConn *conn;
+	
+    List *cgivars;
+    SMPP_PDU *pdu;
+//    Connection *conn;
+    SmppConn *smpp_conn = NULL;
+    time_t last_cleanup, last_enquire_sent, last_response, now;
+    Octstr *smsc_id, *host, *sys_type, *username, *password;
+    
+    smpp_conn = arg;
+    smsc_id = octstr_duplicate(smpp_conn->smpp_id);
+    host = octstr_duplicate(smpp_conn->smpp_host);
+    sys_type = octstr_duplicate(smpp_conn->sys_type);
+    username = octstr_duplicate(smpp_conn->system_id);
+    password = octstr_duplicate(smpp_conn->passwd);
+    transmit_port = octstr_format("%ld", smpp_conn->transmit_port);
+    receiver_port = octstr_format("%ld", smpp_conn->receiver_port);
+    transportation_type = octstr_format("%ld", smpp_conn->transportation_type);
+    
+    grp = create_group();
+    cfg_set(grp, octstr_imm("smsc"), octstr_imm("smpp"));
+    cfg_set(grp, octstr_imm("smsc-id"), smsc_id);
+    cfg_set(grp, octstr_imm("host"), host);
+    cfg_set(grp, octstr_imm("port"), transmit_port);
+	cfg_set(grp, octstr_imm("receive-port"), receiver_port);
+    cfg_set(grp, octstr_imm("smsc-username"), username);
+    cfg_set(grp, octstr_imm("smsc-password"), password);
+    cfg_set(grp, octstr_imm("system-type"), sys_type);
+    cfg_set(grp, octstr_imm("transceiver-mode"), transportation_type);
+//
+    split_msg_counter = counter_create();
+    
+    conn = smscconn_create(grp, 1);
+    if (conn == NULL)
+        panic(0, "Cannot start with SMSC connection failing");
+    
+    counter_destroy(split_msg_counter);
+}
+
+static Octstr *conn_status;
+static int conn_err;
+
+void smpp_smscconn_failed(Octstr *message)
+{
+    conn_status = message;
+    conn_ready = 1;
+    conn_err = 1;
+}
+
+void smpp_smscconn_connected(Octstr *stat)
+{
+    conn_status = stat;
+    conn_ready = 1;
+    conn_err = 0;
+}
+
+int smpp_smscconn_stop(void)
+{
+	int success = 0;
+	
+	if (conn != NULL && smscconn_status(conn) == SMSCCONN_DEAD) {
+		info(0, "HTTP: Could not shutdown already dead smsc-id ");
+	} else {
+		info(0,"HTTP: Shutting down smpp connection ");
+		smscconn_shutdown(conn, 1);   /* shutdown the smpp connection */
+		success = 1;
+	}
+	
+	return success;
+}
+
 Octstr *smpp_connect(SmppConn *smpp_conn)
 {
-	return octstr_create("\"status\":\"Connecting...\"");
+    int ret;
+    long len;
+    long pending_submits;
+    char *conn_error;
+    double timeout;
+    long transmit_port;
+    int receiver_port, transportation_type;
+    
+    List *cgivars;
+    SMPP_PDU *pdu;
+    Connection *conn;
+    Octstr *smsc_id, *host, *sys_type, *username, *password;
+    
+    smsc_id = octstr_duplicate(smpp_conn->smpp_id);
+    host = octstr_duplicate(smpp_conn->smpp_host);
+    sys_type = octstr_duplicate(smpp_conn->sys_type);
+    username = octstr_duplicate(smpp_conn->system_id);
+    password = octstr_duplicate(smpp_conn->passwd);
+    transmit_port = smpp_conn->transmit_port;
+    receiver_port = smpp_conn->receiver_port;
+	transportation_type = smpp_conn->transportation_type;
+	
+    if (octstr_len(smsc_id) <= 0 &&
+        octstr_len(host) <= 0 &&
+        octstr_len(sys_type) <= 0 &&
+        octstr_len(username) <= 0 &&
+        octstr_len(password) <= 0) {
+        
+        return NULL;
+    }
+    conn_ready = 0;
+    fd_smpp_connect = gwthread_create(smpp_client_connect, smpp_conn);
+    
+    while (!conn_ready)
+        ;;
+    
+    return octstr_format("\"error\":\"%d\",\"status\":\"%s\"", conn_err, octstr_get_cstr(conn_status));
 }
 
 int main(int argc, char **argv)

@@ -93,6 +93,7 @@ typedef struct {
 	Octstr *passwd;
 	long transmit_port;
 	int receiver_port;
+	int transportation_type;
 } SmppConn;
 
 /*---------------
@@ -105,3 +106,7 @@ void httpadmin_stop(void);
 Octstr *print_status(List *cgivars, int status_type);
 Octstr *print_homepage(List *cgivars, int status_type);
 Octstr *smpp_connect(SmppConn *smpp_conn);
+
+void smpp_smscconn_failed(Octstr *error);
+void smpp_smscconn_connected(Octstr *stat);
+int smpp_smscconn_stop(void);

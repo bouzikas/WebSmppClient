@@ -135,6 +135,17 @@ denied:
 	return octstr_create("Denied");
 }
 
+/*
+ * check if we still have time to do things
+ */
+static Octstr *httpd_check_status(void)
+{
+	if (client_status == SHUTDOWN || client_status == DEAD)
+		return octstr_create("Avalanche has already started, too late to "
+							 "save the sheeps");
+	return NULL;
+}
+
 static Octstr *httpd_status(List *cgivars, int status_type)
 {
 	Octstr *reply;
@@ -196,10 +207,27 @@ static Octstr *httpd_connect(List *cgivars, int status_type)
 		smpp_conn->passwd = octstr_duplicate(passwd);
 		smpp_conn->transmit_port = atoi(octstr_get_cstr(http_cgi_variable(cgivars, "port")));
 		smpp_conn->receiver_port = atoi(octstr_get_cstr(http_cgi_variable(cgivars, "receiver_port")));
+		smpp_conn->transportation_type = atoi(octstr_get_cstr(http_cgi_variable(cgivars, "transport_type")));
 		
 		return smpp_connect(smpp_conn);
 	} else
-		return octstr_create("\"error\":\"Parameters are missing.\"");
+		return octstr_create("\"error\":\"1\",\"status\":\"Parameters are missing.\"");
+}
+
+static Octstr *httpd_disconnect(List *cgivars, int status_type)
+{
+	Octstr *reply;
+	Octstr *smsc = octstr_create("SMSC");
+	if ((reply = httpd_check_authorization(cgivars, 0))!= NULL) return reply;
+	if ((reply = httpd_check_status())!= NULL) return reply;
+	
+	/* check if the smsc id is given */
+	if (smpp_smscconn_stop() == -1)
+		return octstr_format("\"error\":\"1\",\"status\":\"Could not shut down smpp connection\"");
+	else
+		return octstr_format("\"error\":\"0\",\"status\":\"Smpp connection is terminated.\"");
+	
+	
 }
 
 static struct httpd_command {
@@ -212,6 +240,7 @@ static struct httpd_command {
 	{ "/client", "Client", "client", httpd_homepage },
 	{ "/shutdown", "Shutdown", "shutdown", httpd_shutdown },
 	{ "/connect", NULL, "connect", httpd_connect },
+	{ "/disconnect", NULL, "disconnect", httpd_disconnect },
 	{ NULL , NULL } /* terminate list */
 };
 

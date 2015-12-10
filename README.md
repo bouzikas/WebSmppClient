@@ -2,13 +2,14 @@
 A web based tool that allows you to connect and send messages using SMPP protocol.
 
 ### Version
-0.0.1
+0.1.0
 
 ### Installation
 
 ```sh
 $ git clone https://github.com/dimimpou/WebSmppClient.git
 $ cd WebSmppClient
+$ git submodule update --init
 $ autoconf
 $ ./configure --with-mysql "CFLAGS=-O0 -g"	# sets optimization to zero
 $ make

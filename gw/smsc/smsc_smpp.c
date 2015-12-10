@@ -74,6 +74,7 @@
 #include "smsc_p.h"
 #include "smpp_pdu.h"
 #include "smscconn_p.h"
+#include "smpp_client.h"
 #include "sms.h"
 #include "dlr.h"
 #include "meta_data.h"
@@ -1065,7 +1066,7 @@ static int send_messages(SMPP *smpp, Connection *conn, long *pending_submits)
         /* Send PDU, record it as waiting for ack from SMS center */
         pdu = msg_to_pdu(smpp, msg);
         if (pdu == NULL) {
-            bb_smscconn_send_failed(smpp->conn, msg, SMSCCONN_FAILED_MALFORMED, octstr_create("MALFORMED SMS"));
+//            bb_smscconn_send_failed(smpp->conn, msg, SMSCCONN_FAILED_MALFORMED, octstr_create("MALFORMED SMS"));
             continue;
         }
         /* check for write errors */
@@ -1080,7 +1081,7 @@ static int send_messages(SMPP *smpp, Connection *conn, long *pending_submits)
         }
         else { /* write error occurs */
             smpp_pdu_destroy(pdu);
-            bb_smscconn_send_failed(smpp->conn, msg, SMSCCONN_FAILED_TEMPORARILY, NULL);
+//            bb_smscconn_send_failed(smpp->conn, msg, SMSCCONN_FAILED_TEMPORARILY, NULL);
             return -1;
         }
     }
@@ -1478,12 +1479,12 @@ static int handle_pdu(SMPP *smpp, Connection *conn, SMPP_PDU *pdu,
                         dlrmsg->sms.meta_data = octstr_create("");
                     meta_data_set_values(dlrmsg->sms.meta_data, pdu->u.data_sm.tlv, "smpp", 0);
                     /* passing DLR to upper layer */
-                    reason = bb_smscconn_receive(smpp->conn, dlrmsg);
+//                    reason = bb_smscconn_receive(smpp->conn, dlrmsg);
                 } else {
                     /* no DLR will be passed, but we write an access-log entry */
                     reason = SMSCCONN_SUCCESS;
                     msg = data_sm_to_msg(smpp, pdu, &reason);
-                    bb_alog_sms(smpp->conn, msg, "FAILED DLR SMS");
+//                    bb_alog_sms(smpp->conn, msg, "FAILED DLR SMS");
                     msg_destroy(msg);
                 }
                 resp->u.data_sm_resp.command_status = smscconn_failure_reason_to_smpp_status(reason);
@@ -1500,7 +1501,7 @@ static int handle_pdu(SMPP *smpp, Connection *conn, SMPP_PDU *pdu,
                 }
                 time(&msg->sms.time);
                 msg->sms.smsc_id = octstr_duplicate(smpp->conn->id);
-                reason =  bb_smscconn_receive(smpp->conn, msg);
+//                reason =  bb_smscconn_receive(smpp->conn, msg);
                 resp->u.data_sm_resp.command_status = smscconn_failure_reason_to_smpp_status(reason);
            }
            break;
@@ -1536,7 +1537,7 @@ static int handle_pdu(SMPP *smpp, Connection *conn, SMPP_PDU *pdu,
                     if (dlrmsg->sms.meta_data == NULL)
                         dlrmsg->sms.meta_data = octstr_create("");
                     meta_data_set_values(dlrmsg->sms.meta_data, pdu->u.deliver_sm.tlv, "smpp", 0);
-                    reason = bb_smscconn_receive(smpp->conn, dlrmsg);
+//                    reason = bb_smscconn_receive(smpp->conn, dlrmsg);
                 } else
                     reason = SMSCCONN_SUCCESS;
                 resp->u.deliver_sm_resp.command_status = smscconn_failure_reason_to_smpp_status(reason);
@@ -1559,7 +1560,7 @@ static int handle_pdu(SMPP *smpp, Connection *conn, SMPP_PDU *pdu,
                 time(&msg->sms.time);
                 msg->sms.smsc_id = octstr_duplicate(smpp->conn->id);
                 msg->sms.account = octstr_duplicate(smpp->username);
-                reason =  bb_smscconn_receive(smpp->conn, msg);
+//                reason =  bb_smscconn_receive(smpp->conn, msg);
                 resp->u.deliver_sm_resp.command_status = smscconn_failure_reason_to_smpp_status(reason);
             }
             break;
@@ -1609,8 +1610,8 @@ static int handle_pdu(SMPP *smpp, Connection *conn, SMPP_PDU *pdu,
                 else
                     smpp->throttling_err_time = 0;
 
-                bb_smscconn_send_failed(smpp->conn, msg, reason, octstr_format("0x%08lx/%s", pdu->u.submit_sm_resp.command_status,
-                                        smpp_error_to_string(pdu->u.submit_sm_resp.command_status)));
+//                bb_smscconn_send_failed(smpp->conn, msg, reason, octstr_format("0x%08lx/%s", pdu->u.submit_sm_resp.command_status,
+//                                        smpp_error_to_string(pdu->u.submit_sm_resp.command_status)));
                 --(*pending_submits);
             } else {
                 Octstr *tmp;
@@ -1636,7 +1637,7 @@ static int handle_pdu(SMPP *smpp, Connection *conn, SMPP_PDU *pdu,
                     dlr_add(smpp->conn->id, tmp, msg);
 
                 octstr_destroy(tmp);
-                bb_smscconn_sent(smpp->conn, msg, NULL);
+//                bb_smscconn_sent(smpp->conn, msg, NULL);
                 --(*pending_submits);
             } /* end if for SMSC ACK */
             break;
@@ -1662,7 +1663,8 @@ static int handle_pdu(SMPP *smpp, Connection *conn, SMPP_PDU *pdu,
                 smpp->conn->status = SMSCCONN_ACTIVE;
                 time(&smpp->conn->connect_time);
                 mutex_unlock(smpp->conn->flow_mutex);
-                bb_smscconn_connected(smpp->conn);
+                smpp_smscconn_connected(octstr_imm("Client connected with transmitter"));
+//                bb_smscconn_connected(smpp->conn);
             }
             break;
 
@@ -1687,7 +1689,8 @@ static int handle_pdu(SMPP *smpp, Connection *conn, SMPP_PDU *pdu,
                 smpp->conn->status = SMSCCONN_ACTIVE;
                 time(&smpp->conn->connect_time);
                 mutex_unlock(smpp->conn->flow_mutex);
-                bb_smscconn_connected(smpp->conn);
+                smpp_smscconn_connected(octstr_imm("Client connected with transceiver"));
+//                bb_smscconn_(smpp->conn);
             }
             break;
 
@@ -1714,6 +1717,7 @@ static int handle_pdu(SMPP *smpp, Connection *conn, SMPP_PDU *pdu,
                     time(&smpp->conn->connect_time);
                 }
                 mutex_unlock(smpp->conn->flow_mutex);
+                smpp_smscconn_connected(octstr_imm("Client connected with receiver"));
             }
             break;
 
@@ -1762,8 +1766,8 @@ static int handle_pdu(SMPP *smpp, Connection *conn, SMPP_PDU *pdu,
                     smpp->throttling_err_time = 0;
 
                 reason = smpp_status_to_smscconn_failure_reason(cmd_stat);
-                bb_smscconn_send_failed(smpp->conn, msg, reason,
-                                        octstr_format("0x%08lx/%s", cmd_stat, smpp_error_to_string(cmd_stat)));
+//                bb_smscconn_send_failed(smpp->conn, msg, reason,
+//                                        octstr_format("0x%08lx/%s", cmd_stat, smpp_error_to_string(cmd_stat)));
                 --(*pending_submits);
             }
             break;
@@ -1846,7 +1850,7 @@ static int do_queue_cleanup(SMPP *smpp, long *pending_submits)
                                    (long)difftime(now, smpp_msg->sent_time) ,
                                    octstr_get_cstr(key),
                                    octstr_get_cstr(smpp_msg->msg->sms.receiver));
-                        bb_smscconn_send_failed(smpp->conn, smpp_msg->msg, SMSCCONN_FAILED_TEMPORARILY,NULL);
+//                        bb_smscconn_send_failed(smpp->conn, smpp_msg->msg, SMSCCONN_FAILED_TEMPORARILY, NULL);
                         smpp_msg_destroy(smpp_msg, 0);
                         (*pending_submits)--;
                     }
@@ -2032,12 +2036,14 @@ static void io_thread(void *arg)
         }
         /* set reconnecting status first so that core don't put msgs into our queue */
         if (!smpp->quitting) {
+            smpp_smscconn_failed(octstr_imm("Couldn't connect to SMS center."));
             error(0, "SMPP[%s]: Couldn't connect to SMS center (retrying in %ld seconds).",
                   octstr_get_cstr(smpp->conn->id), smpp->conn->reconnect_delay);
-            mutex_lock(smpp->conn->flow_mutex);
-            smpp->conn->status = SMSCCONN_RECONNECTING;
-            mutex_unlock(smpp->conn->flow_mutex);
-            gwthread_sleep(smpp->conn->reconnect_delay);
+//            mutex_lock(smpp->conn->flow_mutex);
+//            smpp->conn->status = SMSCCONN_DEAD;
+//            mutex_unlock(smpp->conn->flow_mutex);
+            smpp->quitting = 1;
+//            gwthread_sleep(smpp->conn->reconnect_delay);
         }
         /*
          * put all queued messages back into global queue,so if
@@ -2052,14 +2058,15 @@ static void io_thread(void *arg)
 
             long reason = (smpp->quitting?SMSCCONN_FAILED_SHUTDOWN:SMSCCONN_FAILED_TEMPORARILY);
 
-            while((msg = gw_prioqueue_remove(smpp->msgs_to_send)) != NULL)
-                bb_smscconn_send_failed(smpp->conn, msg, reason, NULL);
+            while((msg = gw_prioqueue_remove(smpp->msgs_to_send)) != NULL) {
+//                bb_smscconn_send_failed(smpp->conn, msg, reason, NULL);
+            }
 
             noresp = dict_keys(smpp->sent_msgs);
             while((key = gwlist_extract_first(noresp)) != NULL) {
                 smpp_msg = dict_remove(smpp->sent_msgs, key);
                 if (smpp_msg != NULL) {
-                    bb_smscconn_send_failed(smpp->conn, smpp_msg->msg, reason, NULL);
+//                    bb_smscconn_send_failed(smpp->conn, smpp_msg->msg, reason, NULL);
                     smpp_msg_destroy(smpp_msg, 0);
                 }
                 octstr_destroy(key);
@@ -2089,7 +2096,7 @@ static void io_thread(void *arg)
         mutex_unlock(smpp->conn->flow_mutex);
         
         smpp_destroy(smpp);
-        bb_smscconn_killed();
+//        bb_smscconn_killed();
     }
 }
 
