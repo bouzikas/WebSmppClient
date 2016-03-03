@@ -16,7 +16,7 @@ $ make
 ```
 
 #### MACOSX Libxml2 issue
-If you any error occurred with `iconv` (libxml2), open the auto-generated Makefile and at LIBS replace `-L/opt/local/lib` with `-L/opt/local/include/libxml2` and run make again.
+If any error occurred with `iconv` (libxml2), open the auto-generated Makefile and at LIBS replace `-L/opt/local/lib` with `-L/opt/local/include/libxml2` and run make again.
 
 ### Run client
 ```sh
