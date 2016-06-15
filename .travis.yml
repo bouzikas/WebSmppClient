@@ -4,3 +4,5 @@ compiler: gcc
 before_install:
     - git submodule update --init
     - autoconf
+
+script: ./configure --with-mysql "CFLAGS=-O0 -g" && make && make test
