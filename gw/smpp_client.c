@@ -92,7 +92,7 @@ static Mutex *status_mutex;
 static time_t start_time;
 
 int fd_smpp_connect;
-static conn_ready = 0;
+static int conn_ready = 0;
 
 static SMSCConn *conn;
 static Octstr *smpp_status = NULL;
@@ -273,25 +273,25 @@ static void smpp_client_connect(void *arg)
     transmit_port = octstr_format("%ld", smpp_conn->transmit_port);
     receiver_port = octstr_format("%ld", smpp_conn->receiver_port);
     transportation_type = octstr_format("%ld", smpp_conn->transportation_type);
-    
-    grp = create_group();
-    cfg_set(grp, octstr_imm("smsc"), octstr_imm("smpp"));
-    cfg_set(grp, octstr_imm("smsc-id"), smsc_id);
-    cfg_set(grp, octstr_imm("host"), host);
-    cfg_set(grp, octstr_imm("port"), transmit_port);
-	cfg_set(grp, octstr_imm("receive-port"), receiver_port);
-    cfg_set(grp, octstr_imm("smsc-username"), username);
-    cfg_set(grp, octstr_imm("smsc-password"), password);
-    cfg_set(grp, octstr_imm("system-type"), sys_type);
-    cfg_set(grp, octstr_imm("transceiver-mode"), transportation_type);
-//
-    split_msg_counter = counter_create();
-    
-    conn = smscconn_create(grp, 1);
-    if (conn == NULL)
-        panic(0, "Cannot start with SMSC connection failing");
-    
-    counter_destroy(split_msg_counter);
+	
+//    grp = create_group();
+//    cfg_set(grp, octstr_imm("smsc"), octstr_imm("smpp"));
+//    cfg_set(grp, octstr_imm("smsc-id"), smsc_id);
+//    cfg_set(grp, octstr_imm("host"), host);
+//    cfg_set(grp, octstr_imm("port"), transmit_port);
+//	cfg_set(grp, octstr_imm("receive-port"), receiver_port);
+//    cfg_set(grp, octstr_imm("smsc-username"), username);
+//    cfg_set(grp, octstr_imm("smsc-password"), password);
+//    cfg_set(grp, octstr_imm("system-type"), sys_type);
+//    cfg_set(grp, octstr_imm("transceiver-mode"), transportation_type);
+////
+//    split_msg_counter = counter_create();
+//    
+//    conn = smscconn_create(grp, 0);
+//    if (conn == NULL)
+//        panic(0, "Cannot start with SMSC connection failing");
+//    
+//    counter_destroy(split_msg_counter);
 }
 
 static Octstr *conn_status;
@@ -361,9 +361,9 @@ Octstr *smpp_connect(SmppConn *smpp_conn)
     conn_ready = 0;
     fd_smpp_connect = gwthread_create(smpp_client_connect, smpp_conn);
     
-    while (!conn_ready)
-        ;;
-    
+//    while (!conn_ready)
+//        ;;
+	
     return octstr_format("\"error\":\"%d\",\"status\":\"%s\"", conn_err, octstr_get_cstr(conn_status));
 }
 

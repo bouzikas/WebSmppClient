@@ -126,7 +126,7 @@ wmlscriptobjs = $(wmlscriptsrcs:.c=.o)
 testsrcs = $(wildcard test/*.c)
 testobjs = $(testsrcs:.c=.o)
 testprogs = $(testsrcs:.c=@EXE_EXT@)
-tests = $(testprogs) $(wildcard test/*.sh)
+test = $(testprogs) $(wildcard test/*.sh)
 
 checksrcs = $(wildcard checks/*.c)
 checkobjs = $(checksrcs:.c=.o)
@@ -307,7 +307,10 @@ install-docs:
 		$(INSTALL_DATA) doc/$$docfile/$$docfile.pdf $(DESTDIR)$(docdir)/$$docfile ; \
 		$(INSTALL_DATA) doc/$$docfile/*.png $(DESTDIR)$(docdir)/$$docfile ; \
 	done
-	
+
+test:
+	$(wildcard test/*.sh)
+
 clean:
 	find . -name "*.o" -o -name "*.i" -o -name "*.a" | xargs rm -f
 	rm -f core gw-config $(progs) $(testprogs) $(checkprogs)
@@ -359,6 +362,8 @@ $(checkprogs): $(checkobjs) $(libs)
 pkg: all
 	(cd solaris; mk-solaris-package.sh)
 	echo Package is now in solaris directory
+
+.PHONY: test
 
 gw-config: utils/foobar-config.sh Makefile
 	./utils/foobar-config.sh "-I$(includedir)/kannel @CFLAGS@" \
