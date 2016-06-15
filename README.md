@@ -1,4 +1,5 @@
-# WebSmppClient
+# WebSmppClient [![Build Status](https://travis-ci.org/dimimpou/WebSmppClient.svg?branch=master)](https://travis-ci.org/dimimpou/WebSmppClient)
+
 A web based tool that allows you to connect and send messages using SMPP protocol.
 
 ### Version
