@@ -2,5 +2,5 @@ language: c
 compiler: gcc
 
 before_install:
-	- git submodule update --init
-	- autoconf
+    - git submodule update --init
+    - autoconf
