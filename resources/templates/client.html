@@ -13,14 +13,14 @@
 			<p><input type="text" placeholder="sys-type" class="form-control" name="sys_type" id="sys_type"/></p>
 			<p>
 				<select class="form-control" id="transport_type" name="transport_type">
-					<option value="0">Transportation Type</option>
+					<option value="">Transportation Type</option>
 					<option value="0">Transmitter</option>
 					<option value="1">Receiver</option>
 					<option value="2">Transceiver</option>
 				</select>
 			</p>
 			<p>
-                <button class="btn btn-primary" id="connBtn" type="button">Connect</button>
+                <button class="btn btn-primary" id="connBtn" type="button" disabled>Connect</button>
                 <button class="btn btn-danger" id="discBtn" type="button" disabled>Disconnect</button>
             </p>
 		</div>
@@ -50,7 +50,7 @@
 				</select>
 			</p>
 			<p><textarea id="message" class="form-control"></textarea></p>
-			<button class="btn btn-success" id="sendBtn" type="button">Send Message</button>
+			<button class="btn btn-success" id="sendBtn" type="button" disabled>Send Message</button>
 		</div>
 	</div>
 </div>

@@ -3,7 +3,7 @@
 A web based tool that allows you to connect and send messages using SMPP protocol.
 
 ### Version
-0.1.0
+0.1.1
 
 ### Installation
 

@@ -537,7 +537,7 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 		footer = "</div>"
 					"<footer class=\"footer\">"
 						"<div class=\"container\">"
-							"<p>" GW_NAME " v." GW_VERSION " | Copyright 2015 &copy Dimitris Bouzikas</p>"
+							"<p>" GW_NAME " v." GW_VERSION " | Copyright 2016 &copy Dimitris Bouzikas</p>"
 						"</div>"
 					"</footer>"
 					"<!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->"
