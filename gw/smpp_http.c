@@ -214,6 +214,19 @@ static Octstr *httpd_connect(List *cgivars, int status_type)
 		return octstr_create("\"error\":\"1\",\"status\":\"Parameters are missing.\"");
 }
 
+static Octstr *httpd_conn_status(List *cgivars, int status_type)
+{
+	Octstr *reply;
+	
+	if ((reply = httpd_check_authorization(cgivars, 0))!= NULL) return reply;
+	
+	if (smpp_smscconn_status() == SMSCCONN_SUCCESS) {
+		return octstr_format("\"error\":\"0\",\"status\":\"Connected\"");
+	}
+	
+	return octstr_format("\"error\":\"1\",\"status\":\"Connecting...\"");
+}
+
 static Octstr *httpd_disconnect(List *cgivars, int status_type)
 {
 	Octstr *reply;
@@ -240,6 +253,7 @@ static struct httpd_command {
 	{ "/client", "Client", "client", httpd_homepage },
 	{ "/shutdown", "Shutdown", "shutdown", httpd_shutdown },
 	{ "/connect", NULL, "connect", httpd_connect },
+	{ "/conn_status", NULL, "conn_status", httpd_conn_status },
 	{ "/disconnect", NULL, "disconnect", httpd_disconnect },
 	{ NULL , NULL } /* terminate list */
 };

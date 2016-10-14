@@ -110,3 +110,5 @@ Octstr *smpp_connect(SmppConn *smpp_conn);
 void smpp_smscconn_failed(Octstr *error);
 void smpp_smscconn_connected(Octstr *stat);
 int smpp_smscconn_stop(void);
+int smpp_smscconn_status(void);
+

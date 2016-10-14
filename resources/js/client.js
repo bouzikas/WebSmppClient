@@ -95,26 +95,23 @@ $(document).ready(function(){
                $('.alert').hide().remove();
 			},
 			success: function(data) {
+			   var alert = '';
+			   
                if (data.error == 1) {
-                  var alert = '';
-               
-                  alert += '<div class="alert alert-danger">';
-                  alert += '<strong>SMSC:</strong> '+data.status;
-                  alert += '</div>';
-               
-                  $('#connBtn').attr('disabled', false);
-                  $('#conn_box .panel-body').append(alert);
+                   alert += '<div class="alert alert-danger">';
+                   $('#connBtn').attr('disabled', false);
                } else {
-                   var alert = '';
-                   
                    alert += '<div class="alert alert-success">';
-                   alert += '<strong>SMSC:</strong> '+data.status;
-                   alert += '</div>';
                
-                  $('#connBtn').attr('disabled', true);
-                  $('#discBtn').attr('disabled', true);
-                  $('#conn_box .panel-body').append(alert);
+                   $('#connBtn').attr('disabled', true);
+                   $('#discBtn').attr('disabled', true);
+			   
+			       conn_status();
                }
+			   alert += '<strong>SMSC:</strong> <span class="stat">'+data.status+'</span>';
+			   alert += '</div>';
+			   
+			   $('#conn_box .panel-body').append(alert);
 			}
 		});
 	}
@@ -161,15 +158,17 @@ $(document).ready(function(){
     function conn_status()
     {
         $.ajax({
-            url: url,
+            url: "conn_status?password=password",
             cache: false,
             dataType: "json",
             type: "GET",
-            beforeSend: function() {
-               
-            },
             success: function(data) {
-               
+			   if (data.error == 1) {
+			       conn_status();
+			   } else {
+			       $('#discBtn').attr('disabled', false);
+			       $('#conn_box .panel-body .alert .stat').html(data.status);
+			   }
             }
         });
     }

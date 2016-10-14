@@ -245,25 +245,28 @@ Octstr *print_homepage(List *cgivars, int status_type)
 static void smpp_client_connect(void *arg)
 {
     int ret;
+	int i;
     long len;
     long pending_submits;
     char *conn_error;
     double timeout;
 	Octstr *cfg_filename;
 	Octstr *transmit_port, *receiver_port, *transportation_type;
+	Octstr *conf;
 	
     Cfg *cfg;
     CfgGroup *grp;
+	List *list;
 	
-    List *cgivars;
     SMPP_PDU *pdu;
     SmppConn *smpp_conn = NULL;
     time_t last_cleanup, last_enquire_sent, last_response, now;
     Octstr *smsc_id, *host, *sys_type, *username, *password;
-    
+	
     smpp_conn = arg;
+	
     smsc_id = octstr_duplicate(smpp_conn->smpp_id);
-    host = octstr_duplicate(smpp_conn->smpp_host);
+	host = octstr_duplicate(smpp_conn->smpp_host);
     sys_type = octstr_duplicate(smpp_conn->sys_type);
     username = octstr_duplicate(smpp_conn->system_id);
     password = octstr_duplicate(smpp_conn->passwd);
@@ -271,30 +274,42 @@ static void smpp_client_connect(void *arg)
     receiver_port = octstr_format("%ld", smpp_conn->receiver_port);
     transportation_type = octstr_format("%ld", smpp_conn->transportation_type);
 	
-//	cfg_filename = octstr_create("kannel.conf");
-//	cfg = cfg_create(cfg_filename);
-//	cfg_read(cfg);
-//	
-//	grp = cfg_get_single_group(cfg, octstr_imm("core"));
+	conf = octstr_format("group = smsc\n"
+						 "smsc = smpp\n"
+						 "smsc-id = %S\n"
+						 "host = %S\n"
+						 "port = %S\n"
+						 "receive-port = %S\n"
+						 "smsc-username = %S\n"
+						 "smsc-password = %S\n"
+						 "system-type = \"%S\"\n"
+						 "transceiver-mode = %S\n\n",
+						 smsc_id,
+						 host,
+						 transmit_port,
+						 receiver_port,
+						 username,
+						 password,
+						 sys_type,
+						 transportation_type);
 	
-//    grp = create_group();
-//    cfg_set(grp, octstr_imm("smsc"), octstr_imm("smpp"));
-//    cfg_set(grp, octstr_imm("smsc-id"), smsc_id);
-//    cfg_set(grp, octstr_imm("host"), host);
-//    cfg_set(grp, octstr_imm("port"), transmit_port);
-//	cfg_set(grp, octstr_imm("receive-port"), receiver_port);
-//    cfg_set(grp, octstr_imm("smsc-username"), username);
-//    cfg_set(grp, octstr_imm("smsc-password"), password);
-//    cfg_set(grp, octstr_imm("system-type"), sys_type);
-//    cfg_set(grp, octstr_imm("transceiver-mode"), transportation_type);
-
-//    split_msg_counter = counter_create();
-//    
-//    conn = smscconn_create(grp, 0);
-//    if (conn == NULL)
-//        panic(0, "Cannot start with SMSC connection failing");
-//    
-//    counter_destroy(split_msg_counter);
+	cfg_filename = octstr_duplicate(resources_path);
+	octstr_append_cstr(cfg_filename, "smpp_conn.conf");
+	
+	octstr_write_data_to_file(conf, octstr_get_cstr(cfg_filename));
+	
+	cfg = cfg_create(cfg_filename);
+	
+	if (cfg_read(cfg) == -1)
+		panic(0, "Couldn't read configuration from `%s'.", octstr_get_cstr(cfg_filename));
+	
+	list = cfg_get_multi_group(cfg, octstr_imm("smsc"));
+	for (i = 0; i < gwlist_len(list) &&
+		 (grp = gwlist_get(list, i)) != NULL; i++) {
+		conn = smscconn_create(grp, 1);
+		if (conn == NULL)
+			panic(0, "Cannot start with SMPP connection failing");
+	}
 }
 
 static Octstr *conn_status;
@@ -312,6 +327,11 @@ void smpp_smscconn_connected(Octstr *stat)
     conn_status = stat;
     conn_ready = 1;
     conn_err = 0;
+}
+
+int smpp_smscconn_status()
+{
+	return smscconn_status(conn);
 }
 
 int smpp_smscconn_stop(void)
@@ -363,9 +383,6 @@ Octstr *smpp_connect(SmppConn *smpp_conn)
     }
     conn_ready = 0;
     fd_smpp_connect = gwthread_create(smpp_client_connect, smpp_conn);
-    
-//    while (!conn_ready)
-//        ;;
 	
     return octstr_format("\"error\":\"%d\",\"status\":\"Connecting...\"", conn_err);
 }
