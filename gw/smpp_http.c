@@ -239,8 +239,36 @@ static Octstr *httpd_disconnect(List *cgivars, int status_type)
 		return octstr_format("\"error\":\"1\",\"status\":\"Could not shut down smpp connection\"");
 	else
 		return octstr_format("\"error\":\"0\",\"status\":\"Smpp connection is terminated.\"");
+}
+
+static Octstr *http_send_message(List *cgivars, int status_type)
+{
+	Octstr *reply;
+	Octstr *sender, *receiver, *data_coding, *message;
 	
+	if ((reply = httpd_check_authorization(cgivars, 0))!= NULL) return reply;
+	if ((reply = httpd_check_status())!= NULL) return reply;
 	
+	/* check variables passed is given */
+	sender = http_cgi_variable(cgivars, "sender");
+	receiver = http_cgi_variable(cgivars, "receiver");
+	data_coding = http_cgi_variable(cgivars, "data_coding");
+	message = http_cgi_variable(cgivars, "message");
+	
+	if (octstr_len(sender)>0 && octstr_len(receiver)>0 && octstr_len(data_coding)>0 && octstr_len(message)>0) {
+		MsgBody *msg_vars;
+		msg_vars = gw_malloc(sizeof(MsgBody));
+		
+		msg_vars->sender = octstr_duplicate(sender);
+		msg_vars->receiver = octstr_duplicate(receiver);
+		msg_vars->data_coding = octstr_duplicate(data_coding);
+		msg_vars->message = octstr_duplicate(message);
+		
+		send_message(msg_vars);
+		
+		return octstr_create("{\"status\":\"Sending message please wait...\"}");
+	} else
+		return octstr_create("{\"error\":\"Parameters are missing.\"}");
 }
 
 static struct httpd_command {
@@ -255,6 +283,7 @@ static struct httpd_command {
 	{ "/connect", NULL, "connect", httpd_connect },
 	{ "/conn_status", NULL, "conn_status", httpd_conn_status },
 	{ "/disconnect", NULL, "disconnect", httpd_disconnect },
+	{ "/send_message", NULL, "send_message", http_send_message },
 	{ NULL , NULL } /* terminate list */
 };
 

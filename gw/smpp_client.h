@@ -96,6 +96,13 @@ typedef struct {
 	int transportation_type;
 } SmppConn;
 
+typedef struct {
+	Octstr *sender;
+	Octstr *receiver;
+	Octstr *data_coding;
+	Octstr *message;
+} MsgBody;
+
 /*---------------
  * smpp_http.c (HTTP Admin)
  */
@@ -111,4 +118,5 @@ void smpp_smscconn_failed(Octstr *error);
 void smpp_smscconn_connected(Octstr *stat);
 int smpp_smscconn_stop(void);
 int smpp_smscconn_status(void);
+void send_message(MsgBody *msg_vars);
 

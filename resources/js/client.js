@@ -59,6 +59,17 @@ $(document).ready(function(){
 			}
 		});
 	});
+				  
+	$('#sendBtn').click(function() {
+		var sender = $('#sender').val();
+		var receiver = $('#receiver').val();
+		var data_coding = $('#data_coding').val();
+		var message = $('#message').val();
+				
+		sendMessage(sender, receiver, data_coding, message);
+    });
+				  
+	
 	
 	function connect(smsc_id, host, sys_type, username, passwd, port, receiver_port, conn_type)
 	{
@@ -116,6 +127,30 @@ $(document).ready(function(){
 		});
 	}
 	
+	function sendMessage(sender, receiver, data_coding, message)
+	{
+		var url = "";
+		
+		url += "send_message?password=password&";
+		url += "sender="+sender+"&";
+		url += "receiver="+receiver+"&";
+		url += "data_coding="+data_coding+"&";
+		url += "message="+message;
+						  
+		$.ajax({
+			url: url,
+			cache: false,
+			dataType: "json",
+			type: "POST",
+			beforeSend: function() {
+               $('#sendBtn').attr('disabled', true);
+			},
+			success: function(data) {
+				$('#sendBtn').attr('disabled', false);
+			}
+		});
+	}			  
+	
 	function enableDisableConnectButton()
 	{
 		if (connectButtonShouldEnabled()) {
@@ -167,6 +202,7 @@ $(document).ready(function(){
 			       conn_status();
 			   } else {
 			       $('#discBtn').attr('disabled', false);
+			       $('#sendBtn').attr('disabled', false);
 			       $('#conn_box .panel-body .alert .stat').html(data.status);
 			   }
             }

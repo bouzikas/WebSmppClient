@@ -306,9 +306,43 @@ static void smpp_client_connect(void *arg)
 	list = cfg_get_multi_group(cfg, octstr_imm("smsc"));
 	for (i = 0; i < gwlist_len(list) &&
 		 (grp = gwlist_get(list, i)) != NULL; i++) {
+		split_msg_counter = counter_create();
 		conn = smscconn_create(grp, 1);
 		if (conn == NULL)
 			panic(0, "Cannot start with SMPP connection failing");
+	}
+}
+
+void send_message(MsgBody *msg_vars)
+{
+	Msg *msg = NULL;
+	Dict *dict;
+	Octstr *smsc_id = NULL;
+	
+	msg = msg_create(sms);
+	msg->sms.sms_type = mt_push;
+	msg->sms.coding = 0;
+	
+	
+	if (smscconn_id(conn)) {
+		smsc_id = octstr_duplicate(smscconn_id(conn));
+	} else {
+		smsc_id = octstr_create("Unknown");
+	}
+	
+	if (msg->sms.meta_data == NULL)
+		msg->sms.meta_data = octstr_create("");
+	
+	meta_data_set_value(msg->sms.meta_data, "smpp", octstr_imm("data_coding"), msg_vars->data_coding, 1);
+	
+	msg->sms.msgdata = octstr_duplicate(msg_vars->message);
+	msg->sms.sender = octstr_duplicate(msg_vars->sender);
+	msg->sms.receiver = octstr_duplicate(msg_vars->receiver);
+	msg->sms.smsc_id = octstr_duplicate(smsc_id);
+	msg->sms.validity = 0;
+	
+	if (smpp_smscconn_status() == SMSCCONN_ACTIVE) {
+		smscconn_send(conn, msg);
 	}
 }
 
@@ -338,6 +372,7 @@ int smpp_smscconn_stop(void)
 {
 	int success = 0;
 	
+	counter_destroy(split_msg_counter);
 	if (conn != NULL && smscconn_status(conn) == SMSCCONN_DEAD) {
 		info(0, "HTTP: Could not shutdown already dead smsc-id ");
 	} else {
