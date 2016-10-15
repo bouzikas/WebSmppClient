@@ -43,8 +43,7 @@
  * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * ====================================================================
+ * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.65 * ====================================================================
  *
  * This software consists of voluntary contributions made by many
  * individuals on behalf of the Kannel Group.  For more information on
@@ -74,6 +73,8 @@
 #include "gwlib/gwlib.h"
 #include "smpp_client.h"
 
+#include "gwlib/json.h"
+
 /* passed from smpp_client core */
 
 extern volatile sig_atomic_t client_status;
@@ -92,6 +93,9 @@ static Octstr *ha_status_pw;
 static Octstr *ha_allow_ip;
 static Octstr *ha_deny_ip;
 
+JSON_Object *reply_object;
+JSON_Value  *root_value;
+
 /* variables to track http calls in order to cache resource requests */
 static Dict *http_calls;
 static Mutex *http_calls_lock;
@@ -99,6 +103,21 @@ static Mutex *http_calls_lock;
 typedef struct Resource {
 	Octstr *last_modified;
 } Resource;
+
+static Octstr *set_error_and_status(int error, const char *status)
+{
+    Octstr *reply;
+    char *json_reply = NULL;
+    
+    json_object_set_number(reply_object, "error", error);
+    json_object_set_string(reply_object, "status", status);
+    json_reply = json_serialize_to_string_pretty(root_value);
+    
+    reply = octstr_create(json_reply);
+    json_free_serialized_string(json_reply);
+    
+    return reply;
+}
 
 /*
  * check if the password matches. Return NULL if
@@ -210,8 +229,10 @@ static Octstr *httpd_connect(List *cgivars, int status_type)
 		smpp_conn->transportation_type = atoi(octstr_get_cstr(http_cgi_variable(cgivars, "transport_type")));
 		
 		return smpp_connect(smpp_conn);
-	} else
-		return octstr_create("\"error\":\"1\",\"status\":\"Parameters are missing.\"");
+    } else {
+        return set_error_and_status(1, "Parameters are missing");
+    }
+		
 }
 
 static Octstr *httpd_conn_status(List *cgivars, int status_type)
@@ -221,10 +242,10 @@ static Octstr *httpd_conn_status(List *cgivars, int status_type)
 	if ((reply = httpd_check_authorization(cgivars, 0))!= NULL) return reply;
 	
 	if (smpp_smscconn_status() == SMSCCONN_SUCCESS) {
-		return octstr_format("\"error\":\"0\",\"status\":\"Connected\"");
+        return set_error_and_status(0, "Connected");
 	}
-	
-	return octstr_format("\"error\":\"1\",\"status\":\"Connecting...\"");
+    
+    return set_error_and_status(0, "Connecting...");
 }
 
 static Octstr *httpd_disconnect(List *cgivars, int status_type)
@@ -236,9 +257,9 @@ static Octstr *httpd_disconnect(List *cgivars, int status_type)
 	
 	/* check if the smsc id is given */
 	if (smpp_smscconn_stop() == -1)
-		return octstr_format("\"error\":\"1\",\"status\":\"Could not shut down smpp connection\"");
+        return set_error_and_status(1, "Could not shut down smpp connection");
 	else
-		return octstr_format("\"error\":\"0\",\"status\":\"Smpp connection is terminated.\"");
+        return set_error_and_status(0, "Smpp connection is terminated.");
 }
 
 static Octstr *http_send_message(List *cgivars, int status_type)
@@ -266,9 +287,9 @@ static Octstr *http_send_message(List *cgivars, int status_type)
 		
 		send_message(msg_vars);
 		
-		return octstr_create("{\"status\":\"Sending message please wait...\"}");
+        return set_error_and_status(0, "Sending message please wait...");
 	} else
-		return octstr_create("{\"error\":\"Parameters are missing.\"}");
+		return set_error_and_status(1, "Parameters are missing");
 }
 
 static struct httpd_command {
@@ -593,9 +614,9 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 		
 		content_type = "text/html";
 	} else if (status_type == STATUS_JSON) {
-		header = "{";
+		header = "";
 		container = "";
-		footer = "}";
+		footer = "";
 		content_type = "application/json";
 		menu = octstr_create("");
 	} else {
@@ -721,6 +742,9 @@ int httpadmin_start(Cfg *cfg)
 	http_open_port_if(ha_port, ssl, ha_interface);
 	
 	http_calls_init();
+    
+    root_value = json_value_init_object();
+    reply_object = json_value_get_object(root_value);
 	
 	if (gwthread_create(httpadmin_run, NULL) == -1)
 		panic(0, "Failed to start a new thread for HTTP admin");
@@ -746,4 +770,6 @@ void httpadmin_stop(void)
 	ha_status_pw = NULL;
 	ha_allow_ip = NULL;
 	ha_deny_ip = NULL;
+    
+    json_value_free(root_value);
 }
