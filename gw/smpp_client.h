@@ -106,7 +106,6 @@ typedef struct {
 /*---------------
  * smpp_http.c (HTTP Admin)
  */
-char *status_linebreak(int status_type);
 int httpadmin_start(Cfg *config);
 void httpadmin_stop(void);
 

@@ -80,7 +80,7 @@
 extern volatile sig_atomic_t client_status;
 
 
-extern Octstr *resources_path;
+extern Octstr *store_location;
 
 /* our own thingies */
 
@@ -181,19 +181,20 @@ static Octstr *httpd_homepage(List *cgivars, int status_type)
 	return print_homepage(cgivars, status_type);
 }
 
-static Octstr *httpd_shutdown(List *cgivars, int status_type)
+static Octstr *httpd_shutdown(List *cgivars, int *status_code)
 {
 	Octstr *reply;
 	
 	if ((reply = httpd_check_authorization(cgivars, 0))!= NULL) return reply;
 	
 	if (client_status == SHUTDOWN) {
-		return octstr_create("System is shuting down. Please wait...");
+		return set_error_and_status(0, "System is shuting down. Please wait...");
 	}
 	
 	client_status = SHUTDOWN;
+	status_code = HTTP_CREATED;
 	
-	return octstr_create("Bringing system down....");
+	return set_error_and_status(0, "Bringing system down, please wait....");
 }
 
 static Octstr *httpd_connect(List *cgivars, int status_type)
@@ -308,177 +309,18 @@ static struct httpd_command {
 	{ NULL , NULL } /* terminate list */
 };
 
-char *status_linebreak(int status_type)
-{
-	switch (status_type) {
-		case STATUS_HTML:
-			return "<br>\n";
-		case STATUS_WML:
-			return "<br/>\n";
-		case STATUS_TEXT:
-			return "\n";
-		case STATUS_XML:
-			return "\n";
-		case STATUS_JSON:
-			return "\n";
-		default:
-			return NULL;
-	}
-}
-
-static char *ext_content_type(Octstr *extension)
-{
-    char *content_type;
-    
-    if (octstr_str_compare(extension, "png") == 0 || octstr_str_compare(extension, "jpg") == 0) {
-        content_type = "image/png";
-    } else if (octstr_str_compare(extension, "css") == 0) {
-        content_type = "text/css";
-    } else {
-        content_type = "text/plain";
-    }
-    
-    return content_type;
-}
-
-static Octstr *main_menu(const Octstr *active_tab)
-{
-	Octstr *menu, *href = NULL, *hlink = NULL;
-	const char *active_class = "class=\"active\"";
-	int i;
-
-	menu = octstr_create(""
-		"<nav class=\"navbar navbar-default\">"
-			"<div class=\"container\">"
-				"<div class=\"navbar-header\">"
-					"<button aria-controls=\"navbar\" aria-expanded=\"false\" data-target=\"#navbar\" "
-						"data-toggle=\"collapse\" class=\"navbar-toggle collapsed\" type=\"button\">"
-						"<span class=\"sr-only\">Toggle navigation</span>"
-						"<span class=\"icon-bar\"></span>"
-						"<span class=\"icon-bar\"></span>"
-						"<span class=\"icon-bar\"></span>"
-					"</button>"
-					"<a href=\"#\" class=\"navbar-brand\">" GW_NAME "</a>"
-				"</div>"
-				"<div class=\"collapse navbar-collapse\" id=\"navbar\">"
-					"<ul class=\"nav navbar-nav\">");
-	
-	for (i = 0; httpd_commands[i].href != NULL; i++) {
-		if (httpd_commands[i].hlink != NULL) {
-			if (octstr_str_compare(active_tab, httpd_commands[i].command) == 0) {
-				octstr_format_append(menu, "<li %s>", active_class);
-			} else {
-				octstr_append_cstr(menu, "<li>");
-			}
-			octstr_format_append(menu, "<a href=\"%s\">%s</a></li>", httpd_commands[i].href, httpd_commands[i].hlink);
-		}
-	}
-	
-	octstr_append_cstr(menu,
-					"</ul>"
-				"</div>"
-			"</div>"
-		"</nav>");
-	
-	return menu;
-}
-
-static Octstr *file_last_modified(char *filepath)
-{
-	struct stat attrib;
-	char date[40];
-	struct tm tm;
-	Octstr *date_modified = NULL;
-	
-	stat(filepath, &attrib);
-	tm = gw_localtime(attrib.st_ctime);
-	
-	gw_strftime(date, 40, "%a, %d %b %Y %H:%M:%S %Z", &tm);
-	
-	date_modified = octstr_create(date);
-	date[0] = 0;
-	
-	return date_modified;
-}
-
-static void http_calls_destroy(void)
-{
-	dict_destroy(http_calls);
-	mutex_destroy(http_calls_lock);
-}
-
-static void http_calls_res_destroy(void *item)
-{
-	Resource *res = (void *)item;
-	
-	if (res == NULL) {
-		return;
-	}
-	
-	if (res->last_modified) {
-		octstr_destroy(res->last_modified);
-	}
-	
-	res->last_modified = NULL;
-	
-	gw_free(res);
-}
-
-static void http_calls_init(void)
-{
-	http_calls = dict_create(1024, http_calls_res_destroy);
-	http_calls_lock = mutex_create();
-}
-
-static inline Octstr *http_call_key(Octstr *ip, Octstr *file, Octstr *user_agent)
-{
-	return octstr_format("%S:%S:%S", ip, file, user_agent);
-}
-
-static Resource *http_calls_get(Octstr *ip, Octstr *file, Octstr *user_agent)
-{
-	Octstr *key;
-	List *list = NULL;
-	Resource *res = NULL;
-	
-	key = http_call_key(ip, file, user_agent);
-	mutex_lock(http_calls_lock);
-	res = dict_get(http_calls, key);
-	mutex_unlock(http_calls_lock);
-	
-	return res;
-}
-
-static void http_calls_put(Octstr *ip, Octstr *file, Resource *resource, Octstr *user_agent)
-{
-	Octstr *key;
-	List *list;
-	Resource *res;
-	
-	key = http_call_key(ip, file, user_agent);
-	mutex_lock(http_calls_lock);
-	res = dict_get(http_calls, key);
-	if (res == NULL) {
-		dict_put(http_calls, key, resource);
-	}
-	mutex_unlock(http_calls_lock);
-}
-
-
 static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 						Octstr *body, List *cgivars, Octstr *ip)
 {
-	Octstr *reply, *final_reply, *url;
-	Octstr *res_path, *menu = NULL, *last_modified = NULL;
+	Octstr *reply, *url;
 	Octstr *user_agent = NULL;
 	char *content_type;
-	char *header, *container, *footer;
 	int status_type;
 	int status_code = HTTP_OK;
 	int i;
 	long pos;
 	
-	reply = final_reply = NULL; /* for compiler please */
+	reply = NULL; /* for compiler please */
 	url = octstr_duplicate(ourl);
 	
 	/* Set default reply format according to client
@@ -516,142 +358,34 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 	
 	/* check if it is a resource file or if not exist retur `404 not found' */
 	if (httpd_commands[i].command == NULL) {
-		res_path = octstr_duplicate(resources_path);
-		octstr_append(res_path, url);
-		
-		if (access(octstr_get_cstr(res_path), F_OK) != -1) {
-			reply = octstr_read_file(octstr_get_cstr(res_path));
-			status_type = STATUS_TEXT;
-			
-			Resource *res = NULL;
-			
-			user_agent = http_header_value(headers, octstr_imm("User-Agent"));
-			res = http_calls_get(ip, res_path, user_agent);
-			
-			last_modified = file_last_modified(octstr_get_cstr(res_path));
-			if (res != NULL) {
-				if (octstr_compare(res->last_modified, last_modified) == 0) {
-					status_code = HTTP_NOT_MODIFIED;
-				} else {
-					res->last_modified = octstr_duplicate(last_modified);
-				}
-			} else {
-				res = gw_malloc(sizeof(*res));
-				res->last_modified = octstr_duplicate(last_modified);
-				http_calls_put(ip, res_path, res, user_agent);
-			}
-			
-            long pos = octstr_search_char(res_path, '.', octstr_len(res_path) - 5);
-			octstr_delete(res_path, 0, pos + 1);
-			
-            content_type = ext_content_type(res_path);
-		}
-		
-		octstr_destroy(res_path);
-		
-		header = "";
-		container = "";
-		footer = "";
-		menu = octstr_create("");
-		
-		if (reply == NULL) {
-		
-			status_code = HTTP_NOT_FOUND;
-			reply = octstr_format("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">\n"
-								   "<html><head>\n"
-								   "<title>404 Not Found</title>\n"
-								   "</head><body>\n"
-								   "<h1>Not Found</h1>\n"
-								   "<p>The requested URL %S was not found on this server.</p>\n"
-								   "</body></html>", ourl);
-		}
+		status_code = HTTP_NOT_FOUND;
+		reply = octstr_format("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">\n"
+							  "<html><head>\n"
+							  "<title>404 Not Found</title>\n"
+							  "</head><body>\n"
+							  "<h1>Not Found</h1>\n"
+							  "<p>The requested URL %S was not found on this server.</p>\n"
+							  "</body></html>", ourl);
 		
 		goto finished;
 	}
 	
-	if (status_type == STATUS_HTML) {
-		
-		menu = main_menu(url);
-		
-		header = "<!DOCTYPE html>"
-					"<html lang=\"en\">"
-						"<head>"
-							"<meta charset=\"utf-8\">"
-							"<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">"
-							"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-							"<!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->"
-							"<title>" GW_NAME " v." GW_VERSION " </title>"
-							""
-							"<!-- Bootstrap -->"
-							"<link href=\"http://127.0.0.1:8000/css/bootstrap/css/bootstrap.min.css\" rel=\"stylesheet\">"
-							"<link href=\"http://127.0.0.1:8000/css/bootstrap/css/bootstrap-theme.min.css\" rel=\"stylesheet\">"
-							"<link href=\"http://127.0.0.1:8000/css/style.css\" rel=\"stylesheet\">"
-							""
-							"<!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->"
-							"<!-- WARNING: Respond.js doesn't work if you view the page via file:// -->"
-							"<!--[if lt IE 9]>"
-							"	<script src=\"https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js\"></script>"
-							"	<script src=\"https://oss.maxcdn.com/respond/1.4.2/respond.min.js\"></script>"
-							"<![endif]-->"
-						"</head>"
-						"<body>";
-	
-		container =	"<div class=\"container\">";
-		
-		footer = "</div>"
-					"<footer class=\"footer\">"
-						"<div class=\"container\">"
-							"<p>" GW_NAME " v." GW_VERSION " | Copyright 2016 &copy Dimitris Bouzikas</p>"
-						"</div>"
-					"</footer>"
-					"<!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->"
-					"<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js\"></script>"
-					"<!-- Include all compiled plugins (below), or include individual files as needed -->"
-					"<script src=\"http://127.0.0.1:8000/css/bootstrap/js/bootstrap.min.js\"></script>"
-					"<script src=\"http://127.0.0.1:8000/js/client.js\"></script>"
-				"</body>"
-			"</html>";
-		
-		content_type = "text/html";
-	} else if (status_type == STATUS_JSON) {
-		header = "";
-		container = "";
-		footer = "";
-		content_type = "application/json";
-		menu = octstr_create("");
-	} else {
-		header = "";
-		container = "";
-		footer = "";
-		content_type = "text/plain";
-		menu = octstr_create("");
-	}
+	content_type = "application/json";
 
 finished:
 	
 	gw_assert(reply != NULL);
-	final_reply = octstr_format("%s%s", header, octstr_get_cstr(menu));
-	octstr_append_cstr(final_reply, container);
-	octstr_append(final_reply, reply);
-	octstr_append_cstr(final_reply, footer);
 	
 	http_destroy_headers(headers);
 	headers = gwlist_create();
 	
-	if (last_modified != NULL) {
-		http_header_add(headers, "Last-Modified", octstr_get_cstr(last_modified));
-	}
-	
 	http_header_add(headers, "Content-Type", content_type);
-	http_send_reply(client, status_code, headers, final_reply);
+	http_send_reply(client, status_code, headers, reply);
 
 	octstr_destroy(url);
 	octstr_destroy(ourl);
 	octstr_destroy(body);
 	octstr_destroy(reply);
-	octstr_destroy(menu);
-	octstr_destroy(last_modified);
-	octstr_destroy(final_reply);
 	octstr_destroy(user_agent);
 	http_destroy_headers(headers);
 	http_destroy_cgiargs(cgivars);
@@ -741,8 +475,7 @@ int httpadmin_start(Cfg *cfg)
 	
 	http_open_port_if(ha_port, ssl, ha_interface);
 	
-	http_calls_init();
-    
+	/* Initialize those responsible for json */
     root_value = json_value_init_object();
     reply_object = json_value_get_object(root_value);
 	
@@ -755,9 +488,7 @@ int httpadmin_start(Cfg *cfg)
 
 
 void httpadmin_stop(void)
-{
-	http_calls_destroy();
-	
+{	
 	http_close_all_ports();
 	gwthread_join_every(httpadmin_run);
 	octstr_destroy(ha_interface);
