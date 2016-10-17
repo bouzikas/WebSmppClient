@@ -77,12 +77,13 @@
 #include "load.h"
 
 #include "smsc/smpp_pdu.h"
+#include "gwlib/json.h"
 
 /* configuration filename */
 Octstr *cfg_filename;
 
-/* Path to resource folder needed for web interface */
-Octstr *resources_path;
+/* Path to storage folder needed for configuration */
+Octstr *store_location;
 
 volatile sig_atomic_t client_status;
 
@@ -158,10 +159,21 @@ static void setup_signal_handlers(void)
 
 static Cfg *init_client(Cfg *cfg)
 {
+	Octstr *log;
 	CfgGroup *grp;
+	long loglevel;
 	
 	grp = cfg_get_single_group(cfg, octstr_imm("core"));
-	resources_path = cfg_get(grp, octstr_imm("store-location"));
+	
+	log = cfg_get(grp, octstr_imm("log-file"));
+	if (log != NULL) {
+		if (cfg_get_integer(&loglevel, grp, octstr_imm("log-level")) == -1)
+			loglevel = 0;
+		log_open(octstr_get_cstr(log), loglevel, GW_NON_EXCL);
+		octstr_destroy(log);
+	}
+	
+	store_location = cfg_get(grp, octstr_imm("store-location"));
 	
 	status_mutex = mutex_create();
 	
@@ -172,16 +184,39 @@ static Cfg *init_client(Cfg *cfg)
 	return cfg;
 }
 
+static Octstr *set_error_and_status(int error, const char *status)
+{
+	Octstr *reply;
+	JSON_Object *reply_object;
+	JSON_Value  *root_value;
+	char *json_reply = NULL;
+	
+	root_value = json_value_init_object();
+	reply_object = json_value_get_object(root_value);
+	
+	json_object_set_number(reply_object, "error", error);
+	json_object_set_string(reply_object, "version", status);
+	json_object_set_string(reply_object, "status", status);
+	json_object_set_string(reply_object, "uptime", status);
+	json_reply = json_serialize_to_string_pretty(root_value);
+	
+	reply = octstr_create(json_reply);
+	json_free_serialized_string(json_reply);
+	json_value_free(root_value);
+	
+	return reply;
+}
+
 Octstr *print_status(List *cgivars, int status_type)
 {
-	char *s, *lb;
-	char *frmt, *footer;
-	Octstr *ret, *str, *version;
-	Octstr *password;
-	time_t t;
+	char *s;
+	Octstr *reply, *uptime, *version;
 	
-	if ((lb = status_linebreak(status_type)) == NULL)
-		return octstr_create("Un-supported format");
+	JSON_Object *reply_object;
+	JSON_Value  *root_value;
+	char *json_reply = NULL;
+	
+	time_t t;
 	
 	t = time(NULL) - start_time;
 	
@@ -190,56 +225,49 @@ Octstr *print_status(List *cgivars, int status_type)
 	else
 		s = "shutting down";
 	
+	root_value = json_value_init_object();
+	reply_object = json_value_get_object(root_value);
+	
 	version = version_report_string("");
+	uptime = octstr_format("%ldd %ldh %ldm %lds", t/3600/24, t/3600%24, t/60%60, t%60);
 	
-	if (status_type == STATUS_HTML) {
-		frmt = "<div class=\"jumbotron\"><p>%s</p>\n\n <p>Status: %s, uptime %ldd %ldh %ldm %lds</p>\n\n";
-		footer = "</p>";
-	} else if (status_type == STATUS_WML) {
-		frmt = "%s</p>\n\n <p>Status: %s, uptime %ldd %ldh %ldm %lds</p>\n\n";
-		footer = "</p>";
-	} else if (status_type == STATUS_XML) {
-		frmt = "<version>%s</version>\n <status>%s, uptime %ldd %ldh %ldm %lds</status>\n";
-		footer = "</p>";
-	} else if (status_type == STATUS_JSON) {
-		octstr_url_encode(version);
-		frmt = "\"version\":\"%s\",\"status\":\"%s\",\"uptime\":\"%ldd %ldh %ldm %lds\"";
-		footer = "";
-	} else {
-		frmt = "%s</p>\n\n <p>Status: %s, uptime %ldd %ldh %ldm %lds</p>\n\n";
-		footer = "";
-	}
+	json_object_set_string(reply_object, "version", octstr_get_cstr(version));
+	json_object_set_string(reply_object, "status", s);
+	json_object_set_string(reply_object, "uptime", octstr_get_cstr(uptime));
+	json_reply = json_serialize_to_string_pretty(root_value);
 	
-	ret = octstr_format(frmt, octstr_get_cstr(version), s, t/3600/24, t/3600%24, t/60%60, t%60);
+	reply = octstr_create(json_reply);
+	json_free_serialized_string(json_reply);
+	json_value_free(root_value);
 	
-	octstr_append_cstr(ret, footer);
 	octstr_destroy(version);
+	octstr_destroy(uptime);
 	
-	return ret;
+	return reply;
 }
 
 Octstr *print_homepage(List *cgivars, int status_type)
 {
-	static char *client_html = "templates/client.html";
-	Octstr *ret = NULL, *resource_file;
-	
-	resource_file = octstr_duplicate(resources_path);
-	octstr_append_cstr(resource_file, client_html);
-	
-	if (conn != NULL && smscconn_status(conn) != SMSCCONN_DEAD) {
-		debug("", 0, "Connection is alive");
-	}
-	
-	if (access(octstr_get_cstr(resource_file), F_OK) != -1) {
-		ret = octstr_read_file(octstr_get_cstr(resource_file));
-	} else {
-		ret = octstr_create("");
-		error(0, "Template file not found. Can't open file: %s", octstr_get_cstr(resource_file));
-	}
-	
-	octstr_destroy(resource_file);
-	
-	return ret;
+//	static char *client_html = "templates/client.html";
+//	Octstr *ret = NULL, *resource_file;
+//	
+//	resource_file = octstr_duplicate(resources_path);
+//	octstr_append_cstr(resource_file, client_html);
+//	
+//	if (conn != NULL && smscconn_status(conn) != SMSCCONN_DEAD) {
+//		debug("", 0, "Connection is alive");
+//	}
+//	
+//	if (access(octstr_get_cstr(resource_file), F_OK) != -1) {
+//		ret = octstr_read_file(octstr_get_cstr(resource_file));
+//	} else {
+//		ret = octstr_create("");
+//		error(0, "Template file not found. Can't open file: %s", octstr_get_cstr(resource_file));
+//	}
+//	
+//	octstr_destroy(resource_file);
+//	
+//	return ret;
 }
 
 static void smpp_client_connect(void *arg)
@@ -293,7 +321,7 @@ static void smpp_client_connect(void *arg)
 						 sys_type,
 						 transportation_type);
 	
-	cfg_filename = octstr_duplicate(resources_path);
+	cfg_filename = octstr_duplicate(store_location);
 	octstr_append_cstr(cfg_filename, "smpp_conn.conf");
 	
 	octstr_write_data_to_file(conf, octstr_get_cstr(cfg_filename));
@@ -467,7 +495,7 @@ int main(int argc, char **argv)
 	alog_close();		/* if we have any */
 	cfg_destroy(cfg);
 	octstr_destroy(cfg_filename);
-	octstr_destroy(resources_path);
+	octstr_destroy(store_location);
 	gwlib_shutdown();
 	
 	return 0;
