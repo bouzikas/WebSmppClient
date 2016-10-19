@@ -79,3 +79,4 @@ the Kannel Group, please see <http://www.kannel.org/>.
 
 Portions of this software are based upon software originally written at  
 WapIT Ltd., Helsinki, Finland for the Kannel project.
+
